@@ -5,16 +5,21 @@ import {
 	ButtonStyle,
 	Client,
 	ModalBuilder,
+	MessageFlags,
+	StringSelectMenuBuilder,
+	StringSelectMenuOptionBuilder,
 	TextInputBuilder,
 	TextInputStyle,
 	type ButtonInteraction,
 	type Message,
 	type ModalSubmitInteraction,
+	type StringSelectMenuInteraction,
 } from "discord.js";
 import type { ConversationContext } from "../domain/types";
 
 const QUESTION_PREFIX = "question";
 const MAX_TEXT_LENGTH = 1_000;
+const OTHER_VALUE = "__question_other__";
 
 export interface QuestionOption {
 	value: string;
@@ -73,6 +78,10 @@ interface PendingQuestion {
 	message?: Message;
 }
 
+type QuestionComponentRow =
+	| ActionRowBuilder<ButtonBuilder>
+	| ActionRowBuilder<StringSelectMenuBuilder>;
+
 export interface ApprovalAction {
 	action: string;
 	targetIds: readonly string[];
@@ -97,6 +106,21 @@ export function questionOptionButtonStyle(
 	return option.tone === "danger" ? ButtonStyle.Danger : ButtonStyle.Primary;
 }
 
+export function questionTimeoutMs(
+	requestedTimeoutMs: number | undefined,
+	defaultTimeoutMs: number,
+	executionTimeoutMs: number,
+): number {
+	return Math.max(
+		1_000,
+		Math.min(requestedTimeoutMs ?? defaultTimeoutMs, defaultTimeoutMs, executionTimeoutMs - 2_000),
+	);
+}
+
+export function questionUsesSelect(type: QuestionDefinition["type"]): boolean {
+	return type === "single" || type === "multiple";
+}
+
 interface ApprovedToken {
 	authorId: string;
 	channelId: string;
@@ -111,11 +135,15 @@ export class QuestionManager {
 	private readonly pending = new Map<string, PendingQuestion>();
 	private readonly approved = new Map<string, ApprovedToken>();
 	private client?: Client;
+	private readonly maxQuestionTimeoutMs: number;
 
 	public constructor(
 		private readonly defaultTimeoutMs: number,
 		private readonly tokenTtlMs: number,
-	) {}
+		executionTimeoutMs = defaultTimeoutMs,
+	) {
+		this.maxQuestionTimeoutMs = Math.max(1_000, executionTimeoutMs - 2_000);
+	}
 
 	public attachClient(client: Client): void {
 		this.client = client;
@@ -144,9 +172,10 @@ export class QuestionManager {
 		}
 
 		const id = crypto.randomUUID();
-		const timeoutMs = Math.max(
-			1_000,
-			Math.min(definition.timeoutMs ?? this.defaultTimeoutMs, this.defaultTimeoutMs),
+		const timeoutMs = questionTimeoutMs(
+			definition.timeoutMs,
+			this.defaultTimeoutMs,
+			this.maxQuestionTimeoutMs + 2_000,
 		);
 		let pending!: PendingQuestion;
 		const answer = new Promise<QuestionAnswer>((resolve) => {
@@ -181,13 +210,16 @@ export class QuestionManager {
 		const [, id, action, rawIndex] = interaction.customId.split(":");
 		const pending = id ? this.pending.get(id) : undefined;
 		if (!id || !pending) {
-			await interaction.reply({ content: "Cette question est expirée.", ephemeral: true });
+			await interaction.reply({
+				content: "Cette question est expirée.",
+				flags: MessageFlags.Ephemeral,
+			});
 			return;
 		}
 		if (!this.isAuthorized(interaction.user.id, interaction.channelId, pending.scope)) {
 			await interaction.reply({
 				content: "Cette question ne vous est pas destinée.",
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			});
 			return;
 		}
@@ -209,7 +241,7 @@ export class QuestionManager {
 			if (pending.selected.size < minimum) {
 				await interaction.reply({
 					content: `Sélectionnez au moins ${minimum} option${minimum > 1 ? "s" : ""}.`,
-					ephemeral: true,
+					flags: MessageFlags.Ephemeral,
 				});
 				return;
 			}
@@ -223,7 +255,10 @@ export class QuestionManager {
 		const index = Number(rawIndex);
 		const option = this.getOption(pending.definition, index);
 		if (!option) {
-			await interaction.reply({ content: "Cette option n'est plus disponible.", ephemeral: true });
+			await interaction.reply({
+				content: "Cette option n'est plus disponible.",
+				flags: MessageFlags.Ephemeral,
+			});
 			return;
 		}
 
@@ -244,11 +279,14 @@ export class QuestionManager {
 		this.resolvePending(id, this.answerForOption(pending.definition.type, option.value));
 	}
 
-	public async resolveModal(interaction: ModalSubmitInteraction): Promise<void> {
+	public async resolveSelect(interaction: StringSelectMenuInteraction): Promise<void> {
 		const [, id] = interaction.customId.split(":");
 		const pending = id ? this.pending.get(id) : undefined;
 		if (!id || !pending) {
-			await interaction.reply({ content: "Cette question est expirée.", ephemeral: true });
+			await interaction.reply({
+				content: "Cette question est expirée.",
+				flags: MessageFlags.Ephemeral,
+			});
 			return;
 		}
 		if (
@@ -257,7 +295,59 @@ export class QuestionManager {
 		) {
 			await interaction.reply({
 				content: "Cette question ne vous est pas destinée.",
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
+			});
+			return;
+		}
+
+		const values = interaction.values.filter((value) => value !== OTHER_VALUE);
+		if (interaction.values.includes(OTHER_VALUE)) {
+			pending.selected = new Set(values);
+			await interaction.showModal(this.createModal(id, pending.definition));
+			return;
+		}
+
+		if (pending.definition.type === "multiple") {
+			await interaction.update({
+				content: `${pending.definition.question}\n\n✅ ${values.join(", ")}`,
+				components: [],
+			});
+			this.resolvePending(id, { type: "multiple", answered: true, values });
+			return;
+		}
+
+		const value = values[0];
+		if (!value) {
+			await interaction.reply({
+				content: "Sélectionnez une option.",
+				flags: MessageFlags.Ephemeral,
+			});
+			return;
+		}
+		await interaction.update({
+			content: `${pending.definition.question}\n\n✅ ${this.labelForValue(pending.definition, value)}`,
+			components: [],
+		});
+		this.resolvePending(id, { type: "single", answered: true, value });
+	}
+
+	public async resolveModal(interaction: ModalSubmitInteraction): Promise<void> {
+		const [, id] = interaction.customId.split(":");
+		const pending = id ? this.pending.get(id) : undefined;
+		if (!id || !pending) {
+			await interaction.reply({
+				content: "Cette question est expirée.",
+				flags: MessageFlags.Ephemeral,
+			});
+			return;
+		}
+		if (
+			!interaction.channelId ||
+			!this.isAuthorized(interaction.user.id, interaction.channelId, pending.scope)
+		) {
+			await interaction.reply({
+				content: "Cette question ne vous est pas destinée.",
+				flags: MessageFlags.Ephemeral,
 			});
 			return;
 		}
@@ -265,22 +355,27 @@ export class QuestionManager {
 		if (!value || value.length > MAX_TEXT_LENGTH) {
 			await interaction.reply({
 				content: "La réponse doit contenir entre 1 et 1 000 caractères.",
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			});
 			return;
 		}
 
 		if (pending.definition.type === "multiple") {
 			pending.selected.add(value);
-			await interaction.reply({ content: "Réponse ajoutée.", ephemeral: true });
+			await interaction.reply({ content: "Réponse ajoutée.", flags: MessageFlags.Ephemeral });
 			await pending.message?.edit({
-				content: this.renderContent(pending),
-				components: this.renderComponents(pending),
+				content: `${pending.definition.question}\n\n✅ ${[...pending.selected].join(", ")}`,
+				components: [],
+			});
+			this.resolvePending(id, {
+				type: "multiple",
+				answered: true,
+				values: [...pending.selected],
 			});
 			return;
 		}
 
-		await interaction.reply({ content: "Réponse enregistrée.", ephemeral: true });
+		await interaction.reply({ content: "Réponse enregistrée.", flags: MessageFlags.Ephemeral });
 		await pending.message?.edit({
 			content: `${pending.definition.question}\n\n✅ ${value}`,
 			components: [],
@@ -377,7 +472,10 @@ export class QuestionManager {
 		}
 		const values =
 			definition.type === "free" ? [] : definition.options.map((option) => option.value);
-		if (new Set(values).size !== values.length || values.some((value) => !value.trim()))
+		if (
+			new Set(values).size !== values.length ||
+			values.some((value) => !value.trim() || value === OTHER_VALUE)
+		)
 			throw new Error("Les valeurs des options doivent être non vides et uniques.");
 	}
 
@@ -428,8 +526,8 @@ export class QuestionManager {
 		return lines.join("\n");
 	}
 
-	private renderComponents(pending: PendingQuestion): ActionRowBuilder<ButtonBuilder>[] {
-		const { definition, id, selected } = pending;
+	private renderComponents(pending: PendingQuestion): QuestionComponentRow[] {
+		const { definition, id } = pending;
 		if (definition.type === "free") {
 			return [
 				this.row([
@@ -438,27 +536,55 @@ export class QuestionManager {
 				]),
 			];
 		}
+		if (definition.type === "single" || definition.type === "multiple") {
+			const options = definition.options.map((option) => {
+				const builder = new StringSelectMenuOptionBuilder()
+					.setLabel(option.label.slice(0, 100))
+					.setValue(option.value);
+				if (option.description) builder.setDescription(option.description.slice(0, 100));
+				return builder;
+			});
+			if (definition.allowOther) {
+				options.push(
+					new StringSelectMenuOptionBuilder()
+						.setLabel("Autre")
+						.setValue(OTHER_VALUE)
+						.setDescription("Saisir une réponse personnalisée"),
+				);
+			}
+			const menu = new StringSelectMenuBuilder()
+				.setCustomId(`${QUESTION_PREFIX}:${id}:select`)
+				.setPlaceholder(
+					definition.type === "multiple"
+						? "Sélectionner une ou plusieurs options"
+						: "Sélectionner une option",
+				)
+				.setMinValues(definition.type === "multiple" ? (definition.minSelections ?? 1) : 1)
+				.setMaxValues(definition.type === "multiple" ? options.length : 1)
+				.addOptions(options);
+			return [
+				new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu),
+				this.row([this.button(id, "cancel", "Annuler", ButtonStyle.Danger)]),
+			];
+		}
+
 		const buttons = definition.options.map((option, index) =>
 			this.button(
 				id,
 				`choice:${index}`,
-				`${definition.type === "multiple" && selected.has(option.value) ? "✅ " : ""}${option.label}`,
-				this.optionStyle(definition, option, index, selected.has(option.value)),
+				option.label,
+				this.optionStyle(definition, option, index, false),
 			),
 		);
-		if (definition.type !== "closed" && definition.allowOther)
-			buttons.push(this.button(id, "other", "Autre", ButtonStyle.Secondary));
-		if (definition.type === "multiple") {
-			const minimum = definition.minSelections ?? 1;
-			buttons.push(
-				this.button(id, "submit", "Valider", ButtonStyle.Success, selected.size < minimum),
-			);
-		}
-		buttons.push(this.button(id, "cancel", "Annuler", ButtonStyle.Danger));
 		const rows: ActionRowBuilder<ButtonBuilder>[] = [];
 		for (let index = 0; index < buttons.length; index += 5)
 			rows.push(this.row(buttons.slice(index, index + 5)));
 		return rows;
+	}
+
+	private labelForValue(definition: QuestionDefinition, value: string): string {
+		if (definition.type === "free") return value;
+		return definition.options.find((option) => option.value === value)?.label ?? value;
 	}
 
 	private button(

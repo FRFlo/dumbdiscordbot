@@ -12,7 +12,11 @@ import { startScheduler, stopScheduler } from "./ecosystem/scheduler";
 
 const config = loadConfig();
 const observability = new PostHogObservability(config, logger);
-const questions = new QuestionManager(config.approvalTimeoutMs, config.approvalTokenTtlMs);
+const questions = new QuestionManager(
+	config.approvalTimeoutMs,
+	config.approvalTokenTtlMs,
+	config.codeModeTimeout,
+);
 discordRuntime.questions = questions;
 const tools = new ToolRegistry();
 await tools.loadFromDirectory();

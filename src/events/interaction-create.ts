@@ -1,4 +1,4 @@
-import type { Interaction } from "discord.js";
+import { MessageFlags, type Interaction } from "discord.js";
 import type { BotEvent } from "../types";
 
 const event: BotEvent<"interactionCreate"> = {
@@ -8,6 +8,10 @@ const event: BotEvent<"interactionCreate"> = {
 			await interaction.client.questions.resolveButton(interaction);
 			return;
 		}
+		if (interaction.isStringSelectMenu() && interaction.customId.startsWith("question:")) {
+			await interaction.client.questions.resolveSelect(interaction);
+			return;
+		}
 		if (interaction.isModalSubmit() && interaction.customId.startsWith("question:")) {
 			await interaction.client.questions.resolveModal(interaction);
 			return;
@@ -15,7 +19,7 @@ const event: BotEvent<"interactionCreate"> = {
 		if (!interaction.isChatInputCommand()) return;
 		const command = interaction.client.commands.get(interaction.commandName);
 		if (!command) {
-			await interaction.reply({ content: "Commande inconnue.", ephemeral: true });
+			await interaction.reply({ content: "Commande inconnue.", flags: MessageFlags.Ephemeral });
 			return;
 		}
 		try {
@@ -32,7 +36,11 @@ const event: BotEvent<"interactionCreate"> = {
 			});
 			if (interaction.replied || interaction.deferred)
 				await interaction.editReply("Une erreur est survenue.");
-			else await interaction.reply({ content: "Une erreur est survenue.", ephemeral: true });
+			else
+				await interaction.reply({
+					content: "Une erreur est survenue.",
+					flags: MessageFlags.Ephemeral,
+				});
 		}
 	},
 };

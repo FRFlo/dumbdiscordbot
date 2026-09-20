@@ -40,8 +40,8 @@ Le registre publie également une catégorie dérivée et des tags (`sector-scop
 Le tool `question` permet quatre interactions Discord :
 
 - `closed` : deux choix, avec bouton positif vert et bouton négatif/destructif rouge ;
-- `single` : un choix parmi des options décrites, avec une réponse `Autre` facultative ;
-- `multiple` : plusieurs choix parmi des options décrites, avec `Autre` facultatif ;
+- `single` : un menu de sélection avec un choix parmi des options décrites, avec une réponse `Autre` facultative ;
+- `multiple` : un menu de sélection avec plusieurs choix parmi des options décrites, avec `Autre` facultatif ;
 - `free` : réponse libre via une modale Discord.
 
 La réponse est limitée à l'auteur et au salon du contexte courant. Les questions expirées,
