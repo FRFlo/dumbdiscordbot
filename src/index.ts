@@ -17,6 +17,7 @@ const shutdown = async (exitCode: number): Promise<void> => {
   if (shuttingDown) return;
   shuttingDown = true;
   await observability.shutdown();
+  discord.client.followUps.close();
   discord.client.destroy();
   process.exit(exitCode);
 };

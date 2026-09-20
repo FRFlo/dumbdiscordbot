@@ -46,6 +46,16 @@ podman run --env-file .env dumbdiscordbot
 
 Le conteneur reste recommandé pour la production et permet de conserver les limites natives `maxStackSize` et `maxToolCalls` du driver Bun.
 
+## Persistance des sessions
+
+Les conversations follow-up sont persistées dans SQLite via le module natif `bun:sqlite`. Le chemin par défaut est `./data/sessions.sqlite` et peut être changé avec `SESSION_DATABASE_PATH`.
+
+Avec Podman, monte le dossier `data` pour conserver les sessions lors du remplacement du conteneur :
+
+```bash
+podman run --env-file .env -v "${PWD}/data:/app/data" dumbdiscordbot
+```
+
 ## Observabilité PostHog
 
 L’observabilité PostHog est activée lorsque `POSTHOG_API_KEY` est renseignée. Elle utilise les événements natifs [AI Observability](https://posthog.com/docs/ai-observability) (`$ai_trace`, `$ai_generation`, `$ai_span`) et [MCP Analytics](https://posthog.com/docs/mcp-analytics) (`$mcp_tool_call`) pour relier chaque demande Discord, génération et tool call dans une même trace. Les prompts, réponses et payloads de tools sont masqués par défaut.

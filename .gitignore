@@ -32,6 +32,10 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .cache
 *.tsbuildinfo
 
+# SQLite locale des sessions
+data/*.sqlite
+data/*.sqlite-*
+
 # IntelliJ based IDEs
 .idea
 

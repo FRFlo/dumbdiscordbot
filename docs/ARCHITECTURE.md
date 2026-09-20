@@ -102,6 +102,8 @@ La corrélation utilise `$ai_trace_id`, `$ai_session_id` et `$mcp_conversation_i
 
 Pour permettre à l’agent de distinguer une réponse d’un message ambiant, le prompt impose le marqueur exact `[SILENT]` lorsqu’un follow-up ne lui est pas destiné. `messageCreate` ne publie jamais ce marqueur : il supprime l’état immédiatement, ce qui force une nouvelle mention pour reprendre la discussion. Une réponse normale est ajoutée à l’historique et prolonge la fenêtre d’activité.
 
+L’état est stocké dans SQLite avec le module natif `bun:sqlite`, dans `SESSION_DATABASE_PATH` (`./data/sessions.sqlite` par défaut). Le schéma sépare les sessions (`conversation_sessions`) et leurs tours (`conversation_messages`), avec suppression en cascade lors d’un silence ou d’une expiration. En conteneur, `/app/data` doit être monté sur un volume pour conserver la persistance entre déploiements.
+
 ## Exécution et déploiement
 
 Le runtime officiel est Bun `1.3.14`, requis par le driver QuickJS natif utilisé par Code Mode. Le `Dockerfile` installe les dépendances de production, copie uniquement `src/` et exécute le bot avec l’utilisateur non privilégié `bun`. Le workflow GitHub Actions construit l’image sur les pull requests et la publie dans GHCR sur `develop`, `main` et les tags de version.

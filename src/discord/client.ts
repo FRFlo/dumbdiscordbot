@@ -21,6 +21,6 @@ export function createDiscordClient(agent: Agent, logger: Logger, observability:
   client.agent = agent;
   client.logger = logger;
   client.observability = observability;
-  client.followUps = new FollowUpState(config.followUpTimeoutMs);
+  client.followUps = new FollowUpState(config.followUpTimeoutMs, config.sessionDatabasePath);
   return client;
 }

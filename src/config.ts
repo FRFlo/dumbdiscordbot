@@ -8,6 +8,7 @@ export interface AppConfig {
   logLevel: string;
   maxAgentIterations: number;
   followUpTimeoutMs: number;
+  sessionDatabasePath: string;
   codeModeTimeout: number;
   codeModeMemoryLimit: number;
   codeModeMaxStackSize: number;
@@ -35,6 +36,7 @@ export function loadConfig(): AppConfig {
     logLevel: Bun.env.LOG_LEVEL ?? "info",
     maxAgentIterations: Number(Bun.env.MAX_AGENT_ITERATIONS ?? 5),
     followUpTimeoutMs: Number(Bun.env.FOLLOW_UP_TIMEOUT_MS ?? 10 * 60 * 1000),
+    sessionDatabasePath: Bun.env.SESSION_DATABASE_PATH ?? "./data/sessions.sqlite",
     codeModeTimeout: Number(Bun.env.CODE_MODE_TIMEOUT ?? 30_000),
     codeModeMemoryLimit: Number(Bun.env.CODE_MODE_MEMORY_LIMIT ?? 128),
     codeModeMaxStackSize: Number(Bun.env.CODE_MODE_MAX_STACK_SIZE ?? 512 * 1024),
