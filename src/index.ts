@@ -4,19 +4,25 @@ import { DiscordAdapter } from "./discord/discord-adapter";
 import { logger } from "./observability/logger";
 import { PostHogObservability } from "./observability/posthog";
 import { ToolRegistry } from "./tools/registry";
+import { ApprovalManager } from "./discord/approval";
+import { createApprovalTool } from "./tools/approval";
 
 const config = loadConfig();
 const observability = new PostHogObservability(config, logger);
 const tools = new ToolRegistry();
 await tools.loadFromDirectory();
-const agent = new Agent(config, tools, logger, observability);
-const discord = new DiscordAdapter(config, agent, logger, observability);
+const approvals = new ApprovalManager(config.approvalTimeoutMs);
+tools.register(createApprovalTool(approvals));
+const agent = new Agent(config, tools, logger, observability, approvals);
+const discord = new DiscordAdapter(config, agent, logger, observability, approvals);
+approvals.attachClient(discord.client);
 
 let shuttingDown = false;
 const shutdown = async (exitCode: number): Promise<void> => {
   if (shuttingDown) return;
   shuttingDown = true;
   await observability.shutdown();
+  approvals.close();
   discord.client.followUps.close();
   discord.client.destroy();
   process.exit(exitCode);

@@ -1,5 +1,5 @@
 import { chat, maxIterations } from "@tanstack/ai";
-import { createCodeMode } from "@tanstack/ai-code-mode";
+import { createCodeMode, type IsolateDriver, type ToolBinding } from "@tanstack/ai-code-mode";
 import { createQuickJSIsolateDriver } from "@tanstack/ai-isolate-quickjs";
 import { createQuickJSBunIsolateDriver } from "@tanstack/ai-isolate-quickjs-bun";
 import { openaiCompatibleText } from "@tanstack/ai-openai/compatible";
@@ -8,6 +8,7 @@ import type { ConversationContext } from "../domain/types";
 import type { Logger } from "../observability/logger";
 import type { PostHogObservability } from "../observability/posthog";
 import { ToolRegistry } from "../tools/registry";
+import type { ApprovalManager } from "../discord/approval";
 
 const SYSTEM_PROMPT = [
   "Tu es un assistant Discord utile et prudent.",
@@ -15,7 +16,31 @@ const SYSTEM_PROMPT = [
   "Respecte toujours le contexte Discord et les permissions de l'utilisateur.",
   "Lors d'un follow-up sans mention, réponds uniquement [SILENT] si le message ne s'adresse pas à toi.",
   "Si tu réponds [SILENT], n'ajoute aucun autre caractère ni explication.",
+  "Dans execute_typescript, utilise approval({ description, timeoutMs? }) avant toute action Discord sensible et attends son résultat avec await.",
 ].join(" ");
+
+function exposeLocalApproval(driver: IsolateDriver): IsolateDriver {
+  return {
+    createContext: async (config) => {
+      const bindings: Record<string, ToolBinding> = {};
+      for (const [bindingName, binding] of Object.entries(config.bindings)) {
+        const localName = bindingName.startsWith("external_")
+          ? bindingName.slice("external_".length)
+          : bindingName;
+        if (bindings[localName]) throw new Error(`Nom de binding Code Mode dupliqué : ${localName}`);
+        bindings[localName] = { ...binding, name: localName };
+      }
+      return driver.createContext({
+        ...config,
+        bindings,
+      });
+    },
+  };
+}
+
+function removeExternalPrefix(value: string): string {
+  return value.replaceAll("external_", "");
+}
 
 function createIsolateDriver(config: AppConfig, logger: Logger) {
   const isWindowsWithoutNativeLibrary = process.platform === "win32" && !Bun.env.QUICKJS_BUN_NATIVE_LIBRARY;
@@ -37,6 +62,8 @@ function createIsolateDriver(config: AppConfig, logger: Logger) {
 export class Agent {
   private readonly adapter;
   private readonly codeMode;
+  private readonly codeModeTools;
+  private readonly codeModeSystemPrompt: string;
   private readonly model: string;
 
   public constructor(
@@ -44,6 +71,7 @@ export class Agent {
     private readonly tools: ToolRegistry,
     private readonly logger: Logger,
     private readonly observability: PostHogObservability,
+    private readonly approvals: ApprovalManager,
   ) {
     this.model = config.openAiModel;
     this.adapter = openaiCompatibleText(config.openAiModel, {
@@ -51,71 +79,78 @@ export class Agent {
       apiKey: config.openAiApiKey,
     });
     this.codeMode = createCodeMode({
-      driver: createIsolateDriver(config, logger),
+      driver: exposeLocalApproval(createIsolateDriver(config, logger)),
       tools: [...this.tools.all()],
       timeout: config.codeModeTimeout,
       memoryLimit: config.codeModeMemoryLimit,
     });
+    this.codeModeTools = this.codeMode.tools.map((tool) => ({
+      ...tool,
+      description: removeExternalPrefix(tool.description),
+    }));
+    this.codeModeSystemPrompt = removeExternalPrefix(this.codeMode.systemPrompt);
   }
 
   public async respond(context: ConversationContext, maxAgentIterations: number): Promise<string> {
-    const runId = crypto.randomUUID();
-    const distinctId = `discord:${context.authorId}`;
-    const sessionId = `discord:${context.guildId ?? "dm"}:${context.channelId}`;
-    const startedAt = Date.now();
-    this.observability.captureAiStarted(runId, {
-      distinctId,
-      model: this.model,
-      provider: "openai-compatible",
-      guildId: context.guildId,
-      channelId: context.channelId,
-      sessionId,
-      intent: context.content,
-      input: context.content,
-      toolCount: this.codeMode.tools.length,
-    });
-    try {
-      const stream = chat({
-        adapter: this.adapter,
-        messages: [
-          ...(context.history ?? []),
-          { role: "user" as const, content: `${context.authorName}: ${context.content}` },
-        ],
-        systemPrompts: [
-          SYSTEM_PROMPT,
-          ...(context.isFollowUp ? ["Ce message est un follow-up dans une discussion active."] : []),
-          this.codeMode.systemPrompt,
-        ],
-        tools: [...this.codeMode.tools],
-        context,
-        agentLoopStrategy: maxIterations(maxAgentIterations),
-      });
-      const observed = await this.observability.observeAiStream(stream, runId, distinctId, {
+    return this.approvals.run(context, async () => {
+      const runId = crypto.randomUUID();
+      const distinctId = `discord:${context.authorId}`;
+      const sessionId = `discord:${context.guildId ?? "dm"}:${context.channelId}`;
+      const startedAt = Date.now();
+      this.observability.captureAiStarted(runId, {
+        distinctId,
+        model: this.model,
+        provider: "openai-compatible",
+        guildId: context.guildId,
+        channelId: context.channelId,
         sessionId,
-        model: this.model,
         intent: context.content,
-      });
-      const response = observed.response || "Je n'ai pas de réponse à fournir.";
-      this.observability.captureAiCompleted(runId, distinctId, {
-        duration_ms: Date.now() - startedAt,
-        response_chars: response.length,
-        response,
         input: context.content,
-        model: this.model,
-        session_id: sessionId,
-        channel_id: context.channelId,
-        finish_reason: observed.finishReason,
-        tool_calls: observed.toolCalls,
+        toolCount: this.codeModeTools.length,
       });
-      return response;
-    } catch (error) {
-      this.logger.error("Échec de l'exécution TanStack AI", { error: String(error) });
-      this.observability.captureAiFailed(runId, distinctId, error, {
-        model: this.model,
-        session_id: sessionId,
-        duration_ms: Date.now() - startedAt,
-      });
-      return "Je n'ai pas pu traiter cette demande pour le moment.";
-    }
+      try {
+        const stream = chat({
+          adapter: this.adapter,
+          messages: [
+            ...(context.history ?? []),
+            { role: "user" as const, content: `${context.authorName}: ${context.content}` },
+          ],
+          systemPrompts: [
+            SYSTEM_PROMPT,
+            ...(context.isFollowUp ? ["Ce message est un follow-up dans une discussion active."] : []),
+            this.codeModeSystemPrompt,
+          ],
+          tools: [...this.codeModeTools],
+          context,
+          agentLoopStrategy: maxIterations(maxAgentIterations),
+        });
+        const observed = await this.observability.observeAiStream(stream, runId, distinctId, {
+          sessionId,
+          model: this.model,
+          intent: context.content,
+        });
+        const response = observed.response || "Je n'ai pas de réponse à fournir.";
+        this.observability.captureAiCompleted(runId, distinctId, {
+          duration_ms: Date.now() - startedAt,
+          response_chars: response.length,
+          response,
+          input: context.content,
+          model: this.model,
+          session_id: sessionId,
+          channel_id: context.channelId,
+          finish_reason: observed.finishReason,
+          tool_calls: observed.toolCalls,
+        });
+        return response;
+      } catch (error) {
+        this.logger.error("Échec de l'exécution TanStack AI", { error: String(error) });
+        this.observability.captureAiFailed(runId, distinctId, error, {
+          model: this.model,
+          session_id: sessionId,
+          duration_ms: Date.now() - startedAt,
+        });
+        return "Je n'ai pas pu traiter cette demande pour le moment.";
+      }
+    });
   }
 }

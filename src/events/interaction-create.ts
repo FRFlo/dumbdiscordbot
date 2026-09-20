@@ -4,6 +4,10 @@ import type { BotEvent } from "../types";
 const event: BotEvent<"interactionCreate"> = {
   name: "interactionCreate",
   execute: async (interaction: Interaction) => {
+    if (interaction.isButton() && interaction.customId.startsWith("approval:")) {
+      await interaction.client.approvals.resolve(interaction);
+      return;
+    }
     if (!interaction.isChatInputCommand()) return;
     const command = interaction.client.commands.get(interaction.commandName);
     if (!command) {

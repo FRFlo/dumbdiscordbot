@@ -14,6 +14,7 @@ import type { Agent } from "./agent/agent";
 import type { FollowUpState } from "./discord/follow-up";
 import type { Logger } from "./observability/logger";
 import type { PostHogObservability } from "./observability/posthog";
+import type { ApprovalManager } from "./discord/approval";
 
 export type SlashCommandBuilderLike =
   | SlashCommandBuilder
@@ -55,5 +56,6 @@ declare module "discord.js" {
     logger: Logger;
     observability: PostHogObservability;
     followUps: FollowUpState;
+    approvals: ApprovalManager;
   }
 }

@@ -46,6 +46,26 @@ podman run --env-file .env dumbdiscordbot
 
 Le conteneur reste recommandé pour la production et permet de conserver les limites natives `maxStackSize` et `maxToolCalls` du driver Bun.
 
+### Approbations Code Mode
+
+La fonction `approval` permet au code généré d'attendre une validation Discord avant une action sensible :
+
+```ts
+const result = await approval({
+  description: "Envoyer un message dans #general",
+});
+
+if (result.approved) {
+  // appeler ici le tool d'action
+}
+```
+
+Les boutons sont valides pour l'auteur de la demande uniquement. La durée maximale
+est contrôlée par `APPROVAL_TIMEOUT_MS` (20 secondes par défaut), et l'exécution
+Code Mode doit rester inférieure à `CODE_MODE_TIMEOUT`. Cette version conserve
+l'isolate vivant pendant l'attente : une interruption ou un redémarrage du bot
+refuse automatiquement les approbations en attente.
+
 ## Persistance des sessions
 
 Les conversations follow-up sont persistées dans SQLite via le module natif `bun:sqlite`. Le chemin par défaut est `./data/sessions.sqlite` et peut être changé avec `SESSION_DATABASE_PATH`.
