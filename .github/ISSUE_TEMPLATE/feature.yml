@@ -1,7 +1,7 @@
 name: Proposer une fonctionnalité
 description: Décrire une amélioration ou un nouveau tool
 title: "feat: "
-labels: [enhancement]
+labels: [fonctionnalité]
 body:
   - type: textarea
     id: problem
