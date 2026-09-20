@@ -29,7 +29,7 @@ bun run check
 bun run dev
 ```
 
-Le démarrage charge les commandes et événements depuis `src/commands/` et `src/events/`, enregistre `/ping`, puis connecte le client Discord. Ne renseigne jamais de secret dans Git : `.env` est ignoré. Le provider et la boucle agentique sont encore une base d'architecture ; les tools métier viendront ensuite.
+Le démarrage charge les commandes et événements depuis `src/commands/` et `src/events/`, connecte le client Discord, puis synchronise entièrement les commandes. La portée est globale par défaut ou limitée à `DISCORD_GUILD_ID` ; l’autre portée est vidée pour éviter les commandes obsolètes. Ne renseigne jamais de secret dans Git : `.env` est ignoré. Le provider et la boucle agentique sont encore une base d'architecture ; les tools métier viendront ensuite.
 
 ## Configuration IA
 

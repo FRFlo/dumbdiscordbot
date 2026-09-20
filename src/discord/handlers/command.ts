@@ -12,10 +12,26 @@ export async function loadCommands(client: Client, config: AppConfig): Promise<v
     client.commands.set(command.command.name, command);
     commands.push(command.command.toJSON());
   }
+
   const rest = new REST({ version: "10" }).setToken(config.discordToken);
   const route = config.discordGuildId
     ? Routes.applicationGuildCommands(config.discordClientId, config.discordGuildId)
     : Routes.applicationCommands(config.discordClientId);
   await rest.put(route, { body: commands });
-  client.logger.info("Commandes enregistrées", { count: commands.length });
+
+  // Discord maintient des collections globales et de serveur séparées.
+  // Nettoyer l'autre portée évite de conserver des commandes obsolètes.
+  if (config.discordGuildId) {
+    await rest.put(Routes.applicationCommands(config.discordClientId), { body: [] });
+  } else {
+    for (const guild of client.guilds.cache.values()) {
+      await rest.put(Routes.applicationGuildCommands(config.discordClientId, guild.id), { body: [] });
+    }
+  }
+
+  client.logger.info("Commandes synchronisées", {
+    count: commands.length,
+    scope: config.discordGuildId ? "guild" : "global",
+    clearedOtherScopes: true,
+  });
 }

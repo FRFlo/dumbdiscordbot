@@ -32,7 +32,7 @@ src/
 └── observability/     # logs et futures métriques
 ```
 
-Les commandes et événements sont découverts dynamiquement au démarrage. Une commande exporte un objet typé contenant son builder Discord et son exécuteur ; un événement exporte son nom, son caractère unique (`once`) et sa fonction `execute`. Cette convention facilite l'ajout de modules sans modifier le bootstrap.
+Les commandes et événements sont découverts dynamiquement au démarrage. Une commande exporte un objet typé contenant son builder Discord et son exécuteur ; un événement exporte son nom, son caractère unique (`once`) et sa fonction `execute`. Cette convention facilite l'ajout de modules sans modifier le bootstrap. Après la connexion Discord, la liste complète est synchronisée avec `REST.put` : les commandes absentes du code sont supprimées. La portée est globale par défaut ou limitée à `DISCORD_GUILD_ID`, et l'autre portée est explicitement vidée pour éviter les commandes obsolètes.
 
 Les tools suivent la même convention : tout fichier TypeScript sous `src/tools/` est chargé automatiquement. Il peut exporter un seul tool TanStack AI par défaut (fichier par tool) ou un tableau de tools cohérents (fichier par groupe). Les noms doivent être uniques ; le registre refuse les doublons avant le démarrage du bot.
 

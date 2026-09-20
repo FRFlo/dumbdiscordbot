@@ -23,7 +23,7 @@ export class DiscordAdapter {
 
   public async start(): Promise<void> {
     await loadEvents(this.client);
-    await loadCommands(this.client, this.config);
     await this.client.login(this.config.discordToken);
+    await loadCommands(this.client, this.config);
   }
 }
