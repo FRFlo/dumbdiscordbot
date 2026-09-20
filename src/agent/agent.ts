@@ -16,6 +16,7 @@ const SYSTEM_PROMPT = [
 	"Utilise les tools disponibles uniquement quand ils sont nécessaires.",
 	"Respecte toujours le contexte Discord et les permissions de l'utilisateur.",
 	"Réponds toujours à la requête, y compris après l'utilisation de tools, en indiquant clairement et brièvement ce que tu as fait et le résultat obtenu.",
+	"En cas d'échec, ne prétends jamais avoir réussi : explique l'étape concernée, le message d'erreur utile et ce qui peut être tenté ensuite.",
 	"Dans execute_typescript, pour une opération ultra sensible ou une séquence liée, appelle approval({ description, actions: [{ action, targetIds }], timeoutMs? }) une seule fois avec toutes les actions et les listes exactes de cibles. Décris clairement toute la séquence à l'utilisateur. Si approved est vrai, transmets approvalToken: token à chaque tool sensible correspondant. Les tools destructifs refusent toute action ou cible absente de ce jeton. Les lectures et actions réversibles usuelles ne demandent pas d'approbation.",
 ].join(" ");
 
@@ -35,6 +36,11 @@ function createIsolateDriver(config: AppConfig, logger: Logger) {
 		maxStackSize: config.codeModeMaxStackSize,
 		maxToolCalls: config.codeModeMaxToolCalls,
 	});
+}
+
+function describeError(error: unknown): string {
+	if (error instanceof Error && error.message) return error.message;
+	return String(error);
 }
 
 export class Agent {
@@ -108,7 +114,18 @@ export class Agent {
 						model: this.model,
 						intent: context.content,
 					});
-					const response = observed.response || "Je n'ai pas de réponse à fournir.";
+					const response = observed.response.trim()
+						? observed.response
+						: [
+								"Je n'ai pas pu produire une réponse textuelle.",
+								observed.finishReason
+									? `La génération s'est terminée avec le motif « ${observed.finishReason} ».`
+									: "La génération s'est terminée sans motif communiqué.",
+								observed.toolCalls.length
+									? `Tools exécutés : ${observed.toolCalls.join(", ")}.`
+									: "Aucun tool n'a été exécuté.",
+								"Consulte les détails techniques ou réessaie avec une demande plus précise.",
+							].join(" ");
 					this.observability.captureAiCompleted(runId, distinctId, {
 						duration_ms: Date.now() - startedAt,
 						response_chars: response.length,
@@ -128,7 +145,11 @@ export class Agent {
 						session_id: sessionId,
 						duration_ms: Date.now() - startedAt,
 					});
-					return "Je n'ai pas pu traiter cette demande pour le moment.";
+					return [
+						"Je n'ai pas pu traiter la demande.",
+						`Détail de l'erreur : ${describeError(error)}.`,
+						"Aucune réponse fiable n'a été envoyée ; tu peux réessayer ou reformuler la demande.",
+					].join(" ");
 				}
 			}),
 		);
