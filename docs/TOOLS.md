@@ -28,6 +28,7 @@ Les fichiers `discord-*.ts` constituent les catégories principales :
 - `expressions` : emojis et stickers ;
 - `voice` : salons vocaux et instances Stage ;
 - `publishing` : publication, embeds et sondages ;
+- `ecosystem` : heure, tâches persistantes, envois planifiés et crons ;
 - `operations` : planification persistante, opérations longues, recherche,
   permissions, audit, simulation et état des limites.
 
@@ -69,6 +70,31 @@ catégorie reste protégée par une approbation ciblée.
 Les tools avancés n'exposent jamais les tokens de webhook. La création ou
 l'envoi d'un webhook doit utiliser un secret fourni explicitement et ne doit
 pas être recopié dans une réponse, un prompt ou un journal.
+
+## Écosystème et planification
+
+Les tools `ecosystem` persistent leurs tâches dans SQLite et les restaurent au
+redémarrage du bot. `schedule_discord_message` accepte une date ISO avec
+fuseau et vise l'exécution exacte à cette date. `create_cron_job` utilise une
+expression cron à cinq champs (`minute heure jour mois semaine`), un fuseau IANA
+et peut ajouter un délai avant l'envoi. Ce délai permet par exemple de
+déclencher le cron à 17:30 puis de programmer automatiquement l'envoi à 18:00.
+
+Un cron peut aussi exécuter directement un prompt avec `actionType:
+"invoke_agent"`, ou exécuter un script QuickJS isolé avec `actionType:
+"execute_script"`. Le script ne dispose ni du filesystem ni du réseau : il
+reçoit uniquement `send_message`, `get_current_time` et `invoke_agent`. Le
+nombre d'invocations de l'agent est plafonné par `maxAgentCalls` (maximum 3),
+ce qui permet de conditionner un appel dans le script sans créer de boucle
+agentique illimitée.
+
+Toutes les planifications (`schedule_action`, `schedule_persistent_action` et
+les nouveaux tools écosystème) passent par l'API native `Bun.cron`. Les tâches
+à exécution unique sont représentées par un cron Bun arrêté après son premier
+déclenchement.
+
+Les scripts cron restent volontairement limités aux bindings explicitement
+exposés ; les tâches arbitraires ne sont pas exécutées depuis SQLite.
 
 ## Permissions Discord
 

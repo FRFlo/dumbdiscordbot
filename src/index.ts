@@ -7,6 +7,7 @@ import { ToolRegistry } from "./tools/registry";
 import { ApprovalManager } from "./discord/approval";
 import { createApprovalTool } from "./tools/approval";
 import { discordRuntime } from "./tools/discord-runtime";
+import { startScheduler, stopScheduler } from "./ecosystem/scheduler";
 
 const config = loadConfig();
 const observability = new PostHogObservability(config, logger);
@@ -26,6 +27,7 @@ const shutdown = async (exitCode: number): Promise<void> => {
 	shuttingDown = true;
 	await observability.shutdown();
 	approvals.close();
+	stopScheduler();
 	discord.client.followUps.close();
 	discord.client.destroy();
 	process.exit(exitCode);
@@ -45,3 +47,4 @@ process.on("SIGINT", () => void shutdown(0));
 process.on("SIGTERM", () => void shutdown(0));
 
 await discord.start();
+startScheduler(discord.client, agent, config.maxAgentIterations);

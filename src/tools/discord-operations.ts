@@ -7,6 +7,7 @@ import type { ConversationContext } from "../domain/types";
 import { getRecentLogs } from "../observability/logger";
 import { getToolContext, requireChannel, requireClient, requireGuild } from "./discord-runtime";
 import { channelSummary, memberSummary, messageSummary, roleSummary } from "./discord-helpers";
+import { cancelTask, listTasks, scheduleMessage } from "../ecosystem/scheduler";
 
 type Exec = { context?: ConversationContext };
 const anyResult = z.any();
@@ -18,10 +19,6 @@ const db = new Database(dbPath, { create: true, readwrite: true });
 db.run(
 	`CREATE TABLE IF NOT EXISTS discord_operations (id TEXT PRIMARY KEY, guild_id TEXT, channel_id TEXT, action TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL, result TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
 );
-db.run(
-	`CREATE TABLE IF NOT EXISTS discord_scheduled_actions (id TEXT PRIMARY KEY, guild_id TEXT NOT NULL, channel_id TEXT NOT NULL, content TEXT NOT NULL, execute_at INTEGER NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL)`,
-);
-const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
 const schedule = toolDefinition({
 	name: "schedule_persistent_action",
@@ -150,64 +147,27 @@ function operationRow(idValue: string) {
 	> | null;
 }
 
-async function executeScheduled(idValue: string): Promise<void> {
-	const row = db
-		.query("SELECT * FROM discord_scheduled_actions WHERE id = ? AND status = 'pending'")
-		.get(idValue) as { guild_id: string; channel_id: string; content: string } | null;
-	if (!row) return;
-	try {
-		const guild = requireClient().guilds.cache.get(row.guild_id);
-		if (!guild) throw new Error("Serveur Discord inaccessible.");
-		const channel = guild.channels.cache.get(row.channel_id) as any;
-		if (!channel?.isTextBased()) throw new Error("Salon textuel introuvable.");
-		if (!("send" in channel)) throw new Error("Salon non textuel.");
-		await channel.send({ content: row.content });
-		db.run("UPDATE discord_scheduled_actions SET status = 'sent' WHERE id = ?", [idValue]);
-	} catch {
-		db.run("UPDATE discord_scheduled_actions SET status = 'failed' WHERE id = ?", [idValue]);
-	} finally {
-		timers.delete(idValue);
-	}
-}
-
 export default [
 	schedule.server(async ({ channelId, content, delaySeconds }, execution: Exec) => {
 		const context = getToolContext(execution.context);
 		const guild = requireGuild(context);
 		const channel = requireChannel(guild, channelId);
-		const actionId = crypto.randomUUID();
 		const executeAt = Date.now() + delaySeconds * 1_000;
-		db.run(
-			"INSERT INTO discord_scheduled_actions (id, guild_id, channel_id, content, execute_at, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
-			[actionId, guild.id, channel.id, content, executeAt, Date.now()],
-		);
-		timers.set(
-			actionId,
-			setTimeout(() => void executeScheduled(actionId), delaySeconds * 1_000),
-		);
-		return { scheduled: true, id: actionId, executeAt: new Date(executeAt).toISOString() };
+		const task = scheduleMessage({
+			guildId: guild.id,
+			channelId: channel.id,
+			content,
+			runAt: executeAt,
+		});
+		return { scheduled: true, id: task.id, executeAt: new Date(task.runAt).toISOString() };
 	}),
 	listScheduled.server(async ({ status }) => {
 		const filter = status ?? "all";
-		return {
-			actions: db
-				.query(
-					filter === "all"
-						? "SELECT * FROM discord_scheduled_actions ORDER BY execute_at ASC"
-						: "SELECT * FROM discord_scheduled_actions WHERE status = ? ORDER BY execute_at ASC",
-				)
-				.all(...(filter === "all" ? [] : [filter])),
-		};
+		const normalized = filter === "sent" ? "completed" : filter;
+		return { actions: listTasks(normalized) };
 	}),
 	cancelScheduled.server(async ({ id: actionId }) => {
-		const timer = timers.get(actionId);
-		if (timer) clearTimeout(timer);
-		timers.delete(actionId);
-		const result = db.run(
-			"UPDATE discord_scheduled_actions SET status = 'failed' WHERE id = ? AND status = 'pending'",
-			[actionId],
-		);
-		return { cancelled: result.changes > 0, id: actionId };
+		return { cancelled: cancelTask(actionId), id: actionId };
 	}),
 	planBulk.server(async ({ action, targetIds, guildId }) => ({
 		action,

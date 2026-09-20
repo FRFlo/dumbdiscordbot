@@ -1,10 +1,10 @@
 import { toolDefinition } from "@tanstack/ai";
 import { z } from "zod";
 import type { ConversationContext } from "../domain/types";
+import { cancelTask, scheduleMessage } from "../ecosystem/scheduler";
 import { requireChannel, requireGuild } from "./discord-runtime";
 
 type Exec = { context?: ConversationContext };
-const timers = new Map<string, ReturnType<typeof setTimeout>>();
 const schedule = toolDefinition({
 	name: "schedule_action",
 	description: "Programme un rappel interne du bot après approbation.",
@@ -30,23 +30,18 @@ const preview = toolDefinition({
 
 export default [
 	schedule.server(async ({ delaySeconds, channelId, content }, execution: Exec) => {
-		const id = crypto.randomUUID();
 		const guild = requireGuild(execution.context);
-		const timer = setTimeout(() => {
-			const channel = requireChannel(guild, channelId);
-			if ("send" in channel) void channel.send({ content });
-			timers.delete(id);
-		}, delaySeconds * 1_000);
-		timers.set(id, timer);
-		return { scheduled: true, id };
+		const channel = requireChannel(guild, channelId);
+		const task = scheduleMessage({
+			guildId: guild.id,
+			channelId: channel.id,
+			content,
+			runAt: Date.now() + delaySeconds * 1_000,
+		});
+		return { scheduled: true, id: task.id };
 	}),
 	cancel.server(async ({ id }) => {
-		const timer = timers.get(id);
-		if (timer) {
-			clearTimeout(timer);
-			timers.delete(id);
-		}
-		return { cancelled: Boolean(timer), id };
+		return { cancelled: cancelTask(id), id };
 	}),
 	preview.server(async ({ action, targets }) => ({ count: targets.length, action, targets })),
 ];
