@@ -94,6 +94,12 @@ PostHog utilise les événements natifs AI Observability : `$ai_trace` pour la d
 
 La corrélation utilise `$ai_trace_id`, `$ai_session_id` et `$mcp_conversation_id`. Les contenus sont masqués par défaut. `POSTHOG_CAPTURE_AI_CONTENT=true` capture le texte de la réponse et de la demande ; `POSTHOG_CAPTURE_TOOL_PAYLOADS=true` capture les arguments et résultats des tools. Ces options doivent être activées uniquement après revue de la confidentialité. PostHog est désactivé si `POSTHOG_API_KEY` est vide ; `disableGeoip` est activé.
 
+## Follow-up et silence
+
+`FollowUpState` conserve un état par triplet canal/utilisateur/serveur, avec l’historique des tours et la date de dernière activité. Une mention crée ou réinitialise cet état. Un message sans mention est transmis à l’agent seulement si l’état est encore actif ; la durée est configurée par `FOLLOW_UP_TIMEOUT_MS` et vaut 600 000 ms par défaut.
+
+Pour permettre à l’agent de distinguer une réponse d’un message ambiant, le prompt impose le marqueur exact `[SILENT]` lorsqu’un follow-up ne lui est pas destiné. `messageCreate` ne publie jamais ce marqueur : il supprime l’état immédiatement, ce qui force une nouvelle mention pour reprendre la discussion. Une réponse normale est ajoutée à l’historique et prolonge la fenêtre d’activité.
+
 ## Exécution et déploiement
 
 Le runtime officiel est Bun `1.3.14`, requis par le driver QuickJS natif utilisé par Code Mode. Le `Dockerfile` installe les dépendances de production, copie uniquement `src/` et exécute le bot avec l’utilisateur non privilégié `bun`. Le workflow GitHub Actions construit l’image sur les pull requests et la publie dans GHCR sur `develop`, `main` et les tags de version.

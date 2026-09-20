@@ -12,6 +12,8 @@ const SYSTEM_PROMPT = [
   "Tu es un assistant Discord utile et prudent.",
   "Utilise les tools disponibles uniquement quand ils sont nécessaires.",
   "Respecte toujours le contexte Discord et les permissions de l'utilisateur.",
+  "Lors d'un follow-up sans mention, réponds uniquement [SILENT] si le message ne s'adresse pas à toi.",
+  "Si tu réponds [SILENT], n'ajoute aucun autre caractère ni explication.",
 ].join(" ");
 
 export class Agent {
@@ -62,8 +64,15 @@ export class Agent {
     try {
       const stream = chat({
         adapter: this.adapter,
-        messages: [{ role: "user", content: `${context.authorName}: ${context.content}` }],
-        systemPrompts: [SYSTEM_PROMPT, this.codeMode.systemPrompt],
+        messages: [
+          ...(context.history ?? []),
+          { role: "user" as const, content: `${context.authorName}: ${context.content}` },
+        ],
+        systemPrompts: [
+          SYSTEM_PROMPT,
+          ...(context.isFollowUp ? ["Ce message est un follow-up dans une discussion active."] : []),
+          this.codeMode.systemPrompt,
+        ],
         tools: [...this.codeMode.tools],
         context,
         agentLoopStrategy: maxIterations(maxAgentIterations),

@@ -50,6 +50,12 @@ POSTHOG_CAPTURE_TOOL_PAYLOADS=false
 
 Pour PostHog Cloud Europe, utilise `https://eu.i.posthog.com`. Les deux variables `POSTHOG_CAPTURE_*` peuvent être activées après revue des données sensibles. Le client est flushé lors de l’arrêt du bot. Consulte [la documentation d’architecture](docs/ARCHITECTURE.md) pour les événements suivis et les choix de confidentialité.
 
+## Follow-up et silence
+
+Une mention démarre une conversation temporaire par utilisateur et canal. Pendant `FOLLOW_UP_TIMEOUT_MS` (10 minutes par défaut), les messages suivants du même utilisateur sont transmis à l’agent sans nouvelle mention. L’agent reçoit aussi l’historique récent de cette conversation.
+
+Si un follow-up ne s’adresse pas à l’agent, il doit répondre exactement `[SILENT]`. La couche Discord consomme alors ce marqueur sans envoyer de message et ferme immédiatement la conversation ; une nouvelle mention est nécessaire pour reprendre.
+
 ## Déploiement Docker
 
 L’image est construite et publiée automatiquement dans GitHub Container Registry par [le workflow Docker](.github/workflows/docker.yml). Elle est disponible sous `ghcr.io/frflo/dumbdiscordbot` avec les tags de branche, de version et `latest` sur la branche par défaut.

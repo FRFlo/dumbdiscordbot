@@ -17,7 +17,7 @@ export class DiscordAdapter {
     logger: Logger,
     observability: PostHogObservability,
   ) {
-    this.client = createDiscordClient(agent, logger, observability);
+    this.client = createDiscordClient(agent, logger, observability, config);
     this.config = config;
   }
 

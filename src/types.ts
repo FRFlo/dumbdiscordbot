@@ -1,7 +1,6 @@
 import type {
   AutocompleteInteraction,
   ButtonInteraction,
-  CacheType,
   ChatInputCommandInteraction,
   ClientEvents,
   Collection,
@@ -12,6 +11,7 @@ import type {
   SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import type { Agent } from "./agent/agent";
+import type { FollowUpState } from "./discord/follow-up";
 import type { Logger } from "./observability/logger";
 import type { PostHogObservability } from "./observability/posthog";
 
@@ -54,5 +54,6 @@ declare module "discord.js" {
     agent: Agent;
     logger: Logger;
     observability: PostHogObservability;
+    followUps: FollowUpState;
   }
 }

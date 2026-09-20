@@ -1,9 +1,11 @@
 import { Client, Collection, GatewayIntentBits } from "discord.js";
 import type { Agent } from "../agent/agent";
+import type { AppConfig } from "../config";
 import type { Logger } from "../observability/logger";
 import type { PostHogObservability } from "../observability/posthog";
+import { FollowUpState } from "./follow-up";
 
-export function createDiscordClient(agent: Agent, logger: Logger, observability: PostHogObservability): Client {
+export function createDiscordClient(agent: Agent, logger: Logger, observability: PostHogObservability, config: AppConfig): Client {
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
@@ -19,5 +21,6 @@ export function createDiscordClient(agent: Agent, logger: Logger, observability:
   client.agent = agent;
   client.logger = logger;
   client.observability = observability;
+  client.followUps = new FollowUpState(config.followUpTimeoutMs);
   return client;
 }
