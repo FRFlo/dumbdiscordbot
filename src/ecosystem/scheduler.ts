@@ -46,12 +46,16 @@ function utcExpression(timestamp: number): string {
 	return `${date.getUTCMinutes()} ${date.getUTCHours()} ${date.getUTCDate()} ${date.getUTCMonth() + 1} *`;
 }
 
-async function sendMessage(guildId: string, channelId: string, content: string): Promise<void> {
-	const guild = client?.guilds.cache.get(guildId);
-	if (!guild) throw new Error("Serveur Discord inaccessible.");
-	const channel = guild.channels.cache.get(channelId) as any;
-	if (!channel?.isTextBased() || !("send" in channel))
-		throw new Error("Salon textuel introuvable.");
+async function sendMessage(
+	guildId: string | undefined,
+	channelId: string,
+	content: string,
+): Promise<void> {
+	const guild = guildId ? client?.guilds.cache.get(guildId) : undefined;
+	const channel = guild
+		? guild.channels.cache.get(channelId)
+		: await client?.channels.fetch(channelId);
+	if (!channel?.isSendable()) throw new Error("Salon textuel introuvable.");
 	await channel.send({ content });
 }
 
@@ -125,10 +129,10 @@ async function executeScript(
 async function executeTask(taskId: string): Promise<void> {
 	const task = database
 		.query("SELECT * FROM ecosystem_tasks WHERE id = ? AND status = 'pending'")
-		.get(taskId) as { guild_id: string; channel_id: string; content: string } | null;
+		.get(taskId) as { guild_id: string | null; channel_id: string; content: string } | null;
 	if (!task) return;
 	try {
-		await sendMessage(task.guild_id, task.channel_id, task.content);
+		await sendMessage(task.guild_id ?? undefined, task.channel_id, task.content);
 		database.run("UPDATE ecosystem_tasks SET status = 'completed', updated_at = ? WHERE id = ?", [
 			Date.now(),
 			taskId,
@@ -195,7 +199,7 @@ function armCronJob(row: {
 }
 
 export function scheduleMessage(input: {
-	guildId: string;
+	guildId?: string;
 	channelId: string;
 	content: string;
 	runAt: number;
@@ -204,7 +208,7 @@ export function scheduleMessage(input: {
 	const now = Date.now();
 	database.run(
 		"INSERT INTO ecosystem_tasks (id, kind, guild_id, channel_id, content, run_at, status, created_at, updated_at) VALUES (?, 'discord_message', ?, ?, ?, ?, 'pending', ?, ?)",
-		[id, input.guildId, input.channelId, input.content, input.runAt, now, now],
+		[id, input.guildId ?? null, input.channelId, input.content, input.runAt, now, now],
 	);
 	if (client) armTask(id, input.runAt);
 	return { id, runAt: input.runAt };

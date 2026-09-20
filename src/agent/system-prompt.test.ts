@@ -33,5 +33,6 @@ describe("system prompt", () => {
 		expect(SYSTEM_PROMPT).toContain("au lieu de deviner");
 		expect(SYSTEM_PROMPT).toContain("Préfère toujours le déterminisme");
 		expect(SYSTEM_PROMPT).toContain("Intl.DateTimeFormat");
+		expect(SYSTEM_PROMPT).toContain("discord:channel:<id>:thread:<threadId>");
 	});
 });

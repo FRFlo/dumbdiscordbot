@@ -35,6 +35,25 @@ Les fichiers `discord-*.ts` constituent les catégories principales :
 Le registre publie également une catégorie dérivée et des tags (`sector-scoped`,
 `destructive`, `requires-approval`) dans son catalogue interne.
 
+## Diffusion
+
+Les tools d'envoi Discord utilisent une destination normalisée et unique dans
+leur champ `channelId` :
+
+- `discord:channel:<channelId>` : salon textuel ;
+- `discord:channel:<channelId>:thread:<threadId>` : thread rattaché à ce salon (public, privé, annonce ou post de forum) ;
+- `discord:dm:<userId>` : message privé à un membre du serveur courant (ou à
+  l'auteur du message courant en contexte DM).
+- `discord:group:<channelId>` : message privé de groupe déjà accessible au bot.
+
+La valeur `current` représente le canal réellement utilisé par le déclencheur,
+y compris un DM. Un identifiant brut reste accepté pour compatibilité. Les
+identifiants doivent être des snowflakes Discord. Le serveur vérifie le type
+envoyable du canal, la portée du serveur, la correspondance parent/thread et la
+portée de l'utilisateur avant l'envoi. Les catégories, salons vocaux/stage et
+racines de forums ne sont pas des cibles de messages directes. Les mentions
+automatiques sont désactivées.
+
 ## Questions et approbations
 
 Le tool `question` permet quatre interactions Discord :

@@ -2,7 +2,7 @@ import { toolDefinition } from "@tanstack/ai";
 import { z } from "zod";
 import type { ConversationContext } from "../domain/types";
 import { cancelTask, scheduleMessage } from "../ecosystem/scheduler";
-import { requireChannel, requireGuild } from "./discord-runtime";
+import { parseDiscordDestination, resolveDiscordDestination } from "../discord/destination";
 
 type Exec = { context?: ConversationContext };
 const schedule = toolDefinition({
@@ -30,10 +30,10 @@ const preview = toolDefinition({
 
 export default [
 	schedule.server(async ({ delaySeconds, channelId, content }, execution: Exec) => {
-		const guild = requireGuild(execution.context);
-		const channel = requireChannel(guild, channelId);
+		const destination = parseDiscordDestination(channelId, execution.context);
+		const channel = await resolveDiscordDestination(destination, execution.context);
 		const task = scheduleMessage({
-			guildId: guild.id,
+			guildId: "guildId" in channel ? channel.guildId : undefined,
 			channelId: channel.id,
 			content,
 			runAt: Date.now() + delaySeconds * 1_000,

@@ -10,6 +10,7 @@ import {
 	setCronStatus,
 } from "../ecosystem/scheduler";
 import { getToolContext, requireChannel, requireGuild } from "./discord-runtime";
+import { parseDiscordDestination, resolveDiscordDestination } from "../discord/destination";
 
 type Exec = { context?: ConversationContext };
 const anyResult = z.any();
@@ -87,15 +88,20 @@ export default [
 	}),
 	scheduleMessageTool.server(async ({ channelId, content, scheduledAt }, execution: Exec) => {
 		const context = getToolContext(execution.context);
-		const guild = requireGuild(context);
-		const channel = requireChannel(guild, channelId);
+		const destination = parseDiscordDestination(channelId, context);
+		const channel = await resolveDiscordDestination(destination, context);
 		const runAt = Date.parse(scheduledAt);
 		if (runAt <= Date.now()) throw new Error("La date planifiée doit être dans le futur.");
 		if (runAt % 60_000 !== 0)
 			throw new Error("La planification doit être alignée sur une minute exacte.");
 		return {
 			scheduled: true,
-			...scheduleMessage({ guildId: guild.id, channelId: channel.id, content, runAt }),
+			...scheduleMessage({
+				guildId: "guildId" in channel ? channel.guildId : undefined,
+				channelId: channel.id,
+				content,
+				runAt,
+			}),
 			scheduledAt,
 		};
 	}),

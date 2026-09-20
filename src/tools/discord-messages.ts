@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { ConversationContext } from "../domain/types";
 import { approve, ensureChannelInContext, requireChannel, requireGuild } from "./discord-runtime";
 import { messageSummary } from "./discord-helpers";
+import { parseDiscordDestination, resolveDiscordDestination } from "../discord/destination";
 
 type Exec = { context?: ConversationContext };
 const messageInput = z.object({
@@ -52,7 +53,8 @@ const search = toolDefinition({
 });
 const send = toolDefinition({
 	name: "send_message",
-	description: "Envoie un message dans un salon Discord après approbation.",
+	description:
+		"Envoie un message vers une destination Discord. channelId accepte current, un identifiant historique, discord:channel:<id>, discord:channel:<id>:thread:<threadId>, discord:dm:<userId> ou discord:group:<id>.",
 	inputSchema: z.object({ channelId: z.string(), content: z.string().min(1).max(2_000) }),
 	outputSchema: output,
 });
@@ -143,14 +145,16 @@ export default [
 		return { messages: result.slice(0, max) };
 	}),
 	send.server(async ({ channelId, content }, execution: Exec) => {
-		const context = execution.context;
-		const guild = requireGuild(context);
-		const channel = requireChannel(guild, channelId);
-		if (!("send" in channel)) throw new Error("Salon non textuel.");
+		const destination = parseDiscordDestination(channelId, execution.context);
+		const channel = await resolveDiscordDestination(destination, execution.context);
 		return messageSummary(await channel.send({ content }));
 	}),
 	reply.server(async ({ channelId, messageId, content }, execution: Exec) => {
-		const messages = await fetchMessage(channelId, execution.context);
+		const destination = parseDiscordDestination(channelId, execution.context);
+		const channel = await resolveDiscordDestination(destination, execution.context);
+		if (!("messages" in channel))
+			throw new Error("La destination ne permet pas de répondre à un message.");
+		const messages = channel.messages;
 		return messageSummary(
 			await messages.fetch(messageId).then((message) => message.reply({ content })),
 		);
