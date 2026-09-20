@@ -1,0 +1,17 @@
+name: Proposer une fonctionnalité
+description: Décrire une amélioration ou un nouveau tool
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problème à résoudre
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposition
+    validations:
+      required: true

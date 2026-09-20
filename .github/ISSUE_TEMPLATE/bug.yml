@@ -1,0 +1,19 @@
+name: Signaler un bug
+description: Signaler un comportement incorrect
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Décris le comportement observé et le comportement attendu.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Donne les étapes minimales pour reproduire le problème.
+    validations:
+      required: true

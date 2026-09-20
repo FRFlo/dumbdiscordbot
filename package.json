@@ -1,0 +1,24 @@
+{
+  "name": "dumbdiscordbot",
+  "module": "index.ts",
+  "type": "module",
+  "private": false,
+  "description": "Bot Discord agentique piloté par IA avec outils configurables et providers OpenAI-compatible.",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck"
+  },
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "dependencies": {
+    "discord.js": "latest",
+    "openai": "latest"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "latest"
+  }
+}
