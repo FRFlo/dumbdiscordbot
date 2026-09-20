@@ -1,6 +1,6 @@
 {
   "name": "dumbdiscordbot",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "type": "module",
   "private": false,
   "description": "Bot Discord agentique piloté par IA avec outils configurables et providers OpenAI-compatible.",

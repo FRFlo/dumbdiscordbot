@@ -29,7 +29,7 @@ bun run check
 bun run dev
 ```
 
-Le scaffold ne se connecte pas encore à Discord. Ne renseigne jamais de secret dans Git : `.env` est ignoré.
+Le démarrage charge les commandes et événements depuis `src/commands/` et `src/events/`, enregistre `/ping`, puis connecte le client Discord. Ne renseigne jamais de secret dans Git : `.env` est ignoré. Le provider et la boucle agentique sont encore une base d'architecture ; les tools métier viendront ensuite.
 
 ## Configuration IA
 

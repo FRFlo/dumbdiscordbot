@@ -10,6 +10,27 @@ Le bot sera organisé autour de cinq frontières :
 4. **Tool registry** : expose des tools typés, validés et documentés au modèle ;
 5. **Policies and observability** : permissions, confirmations, journaux, métriques et traçabilité.
 
+## Organisation des fichiers Discord
+
+La structure reprend une organisation modulaire éprouvée pour Discord.js :
+
+```text
+src/
+├── agent/             # boucle IA et orchestration des tool calls
+├── commands/          # commandes slash, une commande par fichier
+├── events/            # événements Discord, un événement par fichier
+├── discord/
+│   ├── client.ts      # création et collections du client
+│   └── handlers/      # chargement dynamique commands/events/buttons
+├── providers/         # implémentations OpenAI-compatible
+├── tools/             # registry et futurs tools agentiques
+├── safety/            # politiques de risque et confirmations
+├── domain/            # types métier indépendants de Discord
+└── observability/     # logs et futures métriques
+```
+
+Les commandes et événements sont découverts dynamiquement au démarrage. Une commande exporte un objet typé contenant son builder Discord et son exécuteur ; un événement exporte son nom, son caractère unique (`once`) et sa fonction `execute`. Cette convention facilite l’ajout de modules sans modifier le bootstrap.
+
 La boucle ne doit jamais donner au modèle un accès implicite à Discord, au système de fichiers ou au réseau. Toute capacité passe par un tool explicite.
 
 ## Boucle agentique
