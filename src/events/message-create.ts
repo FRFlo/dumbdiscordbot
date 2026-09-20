@@ -2,6 +2,7 @@ import type { Message } from "discord.js";
 import type { BotEvent } from "../types";
 
 const SILENT_RESPONSE = "[SILENT]";
+const TYPING_REFRESH_MS = 8_000;
 
 function conversationKey(message: Message): string {
   return `${message.guildId ?? "dm"}:${message.channelId}:${message.author.id}`;
@@ -17,11 +18,25 @@ const event: BotEvent<"messageCreate"> = {
     const activeConversation = message.client.followUps.getActive(key);
     if (!addressed && !activeConversation) return;
 
-    const content = message.content.replace(/<@!?(\d+)>/g, "").trim();
+    const content = message.content.replace(/<@!?([0-9]+)>/g, "").trim();
     if (!content) return;
 
     const state = addressed ? message.client.followUps.begin(key) : activeConversation;
     if (!state) return;
+
+    const sendTyping = async (): Promise<void> => {
+      if (!message.channel.isSendable()) return;
+      try {
+        await message.channel.sendTyping();
+      } catch (error) {
+        // L'indicateur est facultatif : une erreur Discord ne doit pas
+        // empêcher la génération ou l'envoi de la réponse.
+        message.client.logger.debug("Impossible d'afficher l'indicateur de saisie", { error: String(error) });
+      }
+    };
+
+    await sendTyping();
+    const typingInterval = setInterval(() => void sendTyping(), TYPING_REFRESH_MS);
     try {
       const response = await message.client.agent.respond({
         content,
@@ -45,6 +60,8 @@ const event: BotEvent<"messageCreate"> = {
         area: "discord.message_create",
         distinct_id: `discord:${message.author.id}`,
       });
+    } finally {
+      clearInterval(typingInterval);
     }
   },
 };

@@ -102,6 +102,8 @@ La corrélation utilise `$ai_trace_id`, `$ai_session_id` et `$mcp_conversation_i
 
 Pour permettre à l’agent de distinguer une réponse d’un message ambiant, le prompt impose le marqueur exact `[SILENT]` lorsqu’un follow-up ne lui est pas destiné. `messageCreate` ne publie jamais ce marqueur : il supprime l’état immédiatement, ce qui force une nouvelle mention pour reprendre la discussion. Une réponse normale est ajoutée à l’historique et prolonge la fenêtre d’activité.
 
+Pendant la génération, `messageCreate` publie également l’indicateur Discord « est en train d’écrire » et le rafraîchit toutes les huit secondes pour les réponses longues. Les erreurs de cet indicateur sont ignorées afin de ne pas interrompre la réponse de l’agent.
+
 L’état est stocké dans SQLite avec le module natif `bun:sqlite`, dans `SESSION_DATABASE_PATH` (`./data/sessions.sqlite` par défaut). Le schéma sépare les sessions (`conversation_sessions`) et leurs tours (`conversation_messages`), avec suppression en cascade lors d’un silence ou d’une expiration. En conteneur, `/app/data` doit être monté sur un volume pour conserver la persistance entre déploiements.
 
 ## Exécution et déploiement
