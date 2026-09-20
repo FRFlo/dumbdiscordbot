@@ -33,7 +33,13 @@ export class ToolRegistry {
 		for (const entry of await readdir(directory, { withFileTypes: true })) {
 			const path = join(directory, entry.name);
 			if (entry.isDirectory()) files.push(...(await this.findToolFiles(path)));
-			else if (entry.isFile() && entry.name.endsWith(".ts")) files.push(path);
+			else if (
+				entry.isFile() &&
+				entry.name.endsWith(".ts") &&
+				!entry.name.endsWith(".test.ts") &&
+				!entry.name.endsWith(".spec.ts")
+			)
+				files.push(path);
 		}
 		return files;
 	}
