@@ -8,6 +8,7 @@ import { ToolRegistry } from "./tools/registry";
 const config = loadConfig();
 const observability = new PostHogObservability(config, logger);
 const tools = new ToolRegistry();
+await tools.loadFromDirectory();
 const agent = new Agent(config, tools, logger, observability);
 const discord = new DiscordAdapter(config, agent, logger, observability);
 

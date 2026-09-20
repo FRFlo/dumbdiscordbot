@@ -22,6 +22,10 @@ Utilise une branche courte basée sur `develop`, par exemple `feat/tool-reminder
 
 Les actions sensibles doivent rester refusées par défaut et nécessiter une confirmation explicite.
 
+## Ajouter un tool
+
+Ajoute un fichier dans `src/tools/` ou dans un sous-dossier métier. Exporte un tool TanStack AI par défaut, ou un tableau de tools si le fichier représente un groupe cohérent. Le registre le découvrira automatiquement au démarrage ; il ne faut pas modifier le bootstrap.
+
 ## Commits
 
 Privilégie des messages impératifs et descriptifs, par exemple `feat: ajouter le contrat des tools`. Une PR doit être relisible et réversible.

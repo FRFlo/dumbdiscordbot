@@ -23,13 +23,32 @@ src/
 │   ├── client.ts      # création et collections du client
 │   └── handlers/      # chargement dynamique commands/events/buttons
 ├── providers/         # implémentations OpenAI-compatible
-├── tools/             # registry et futurs tools agentiques
+├── tools/             # registry et tools agentiques
+│   ├── registry.ts    # découverte et déduplication
+│   ├── core.ts        # groupe de tools liés
+│   └── <groupe>/      # tools organisés par domaine
 ├── safety/            # politiques de risque et confirmations
 ├── domain/            # types métier indépendants de Discord
 └── observability/     # logs et futures métriques
 ```
 
-Les commandes et événements sont découverts dynamiquement au démarrage. Une commande exporte un objet typé contenant son builder Discord et son exécuteur ; un événement exporte son nom, son caractère unique (`once`) et sa fonction `execute`. Cette convention facilite l’ajout de modules sans modifier le bootstrap.
+Les commandes et événements sont découverts dynamiquement au démarrage. Une commande exporte un objet typé contenant son builder Discord et son exécuteur ; un événement exporte son nom, son caractère unique (`once`) et sa fonction `execute`. Cette convention facilite l'ajout de modules sans modifier le bootstrap.
+
+Les tools suivent la même convention : tout fichier TypeScript sous `src/tools/` est chargé automatiquement. Il peut exporter un seul tool TanStack AI par défaut (fichier par tool) ou un tableau de tools cohérents (fichier par groupe). Les noms doivent être uniques ; le registre refuse les doublons avant le démarrage du bot.
+
+Exemples :
+
+```text
+src/tools/
+├── core.ts                 # export default [toolA, toolB]
+├── moderation/
+│   ├── ban.ts               # export default tool
+│   └── warn.ts              # export default tool
+└── server/
+    └── information.ts      # export default tool
+```
+
+Chaque tool doit utiliser `toolDefinition()` avec des schémas d’entrée et de sortie Zod, puis `.server()` pour son implémentation. Les tools sensibles devront déclarer leur policy de permission et leur besoin de confirmation avant d’être ajoutés au registre.
 
 La boucle ne doit jamais donner au modèle un accès implicite à Discord, au système de fichiers ou au réseau. Toute capacité passe par un tool explicite.
 
