@@ -14,6 +14,11 @@ const event: BotEvent<"interactionCreate"> = {
       await command.execute(interaction);
     } catch (error) {
       interaction.client.logger.error("Erreur de commande", { command: interaction.commandName, error: String(error) });
+      interaction.client.observability.captureError(error, {
+        area: "discord.command",
+        command: interaction.commandName,
+        distinct_id: `discord:${interaction.user.id}`,
+      });
       if (interaction.replied || interaction.deferred) await interaction.editReply("Une erreur est survenue.");
       else await interaction.reply({ content: "Une erreur est survenue.", ephemeral: true });
     }

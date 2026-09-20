@@ -69,4 +69,6 @@ Le contexte doit être limité au serveur, au salon et à la conversation néces
 
 ## Observabilité
 
-Les logs structurés devront permettre de relier une requête Discord, un appel modèle et chaque tool call via un identifiant de corrélation, sans enregistrer les secrets ni le contenu sensible par défaut.
+Les logs structurés et PostHog permettent de relier une requête Discord, un appel modèle et chaque tool call via un identifiant de corrélation, sans enregistrer les secrets ni le contenu sensible par défaut.
+
+Les événements PostHog principaux sont `ai_run_started`, `ai_run_finished`, `ai_run_completed`, `ai_run_failed`, `ai_tool_call_started`, `ai_tool_call_finished` et les exceptions applicatives. Ils contiennent le modèle, les durées, les identifiants Discord nécessaires au diagnostic et des compteurs, mais jamais le prompt ou la réponse. PostHog est désactivé si `POSTHOG_API_KEY` est vide ; `disableGeoip` est activé.

@@ -37,6 +37,17 @@ Les variables `OPENAI_BASE_URL`, `OPENAI_API_KEY` et `OPENAI_MODEL` permettent d
 
 Le Code Mode de TanStack AI utilise QuickJS natif via Bun pour exécuter le code généré dans un isolate limité. Les paramètres de sécurité sont configurables dans `.env` avec les variables `CODE_MODE_*`.
 
+## Observabilité PostHog
+
+L’observabilité PostHog est activée lorsque `POSTHOG_API_KEY` est renseignée. Elle suit les exécutions IA, les appels de tools, les durées, les erreurs et les erreurs globales de l’application. Les prompts et réponses ne sont pas envoyés par défaut ; seuls des métadonnées et compteurs sont capturés.
+
+```bash
+POSTHOG_API_KEY=phc_...
+POSTHOG_HOST=https://us.i.posthog.com
+```
+
+Pour PostHog Cloud Europe, utilise `https://eu.i.posthog.com`. Le client est flushé lors de l’arrêt du bot. Consulte [la documentation d’architecture](docs/ARCHITECTURE.md) pour les événements suivis et les choix de confidentialité.
+
 ## Documentation
 
 - [Architecture et principes](docs/ARCHITECTURE.md)

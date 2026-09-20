@@ -13,6 +13,7 @@ import type {
 } from "discord.js";
 import type { Agent } from "./agent/agent";
 import type { Logger } from "./observability/logger";
+import type { PostHogObservability } from "./observability/posthog";
 
 export type SlashCommandBuilderLike =
   | SlashCommandBuilder
@@ -52,5 +53,6 @@ declare module "discord.js" {
     cooldowns: Collection<string, number>;
     agent: Agent;
     logger: Logger;
+    observability: PostHogObservability;
   }
 }

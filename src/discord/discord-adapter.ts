@@ -5,6 +5,7 @@ import { createDiscordClient } from "./client";
 import type { AppConfig } from "../config";
 import type { Agent } from "../agent/agent";
 import type { Logger } from "../observability/logger";
+import type { PostHogObservability } from "../observability/posthog";
 
 export class DiscordAdapter {
   public readonly client: Client;
@@ -14,8 +15,9 @@ export class DiscordAdapter {
     config: AppConfig,
     agent: Agent,
     logger: Logger,
+    observability: PostHogObservability,
   ) {
-    this.client = createDiscordClient(agent, logger);
+    this.client = createDiscordClient(agent, logger, observability);
     this.config = config;
   }
 

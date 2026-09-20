@@ -1,8 +1,9 @@
 import { Client, Collection, GatewayIntentBits } from "discord.js";
 import type { Agent } from "../agent/agent";
 import type { Logger } from "../observability/logger";
+import type { PostHogObservability } from "../observability/posthog";
 
-export function createDiscordClient(agent: Agent, logger: Logger): Client {
+export function createDiscordClient(agent: Agent, logger: Logger, observability: PostHogObservability): Client {
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
@@ -17,5 +18,6 @@ export function createDiscordClient(agent: Agent, logger: Logger): Client {
   client.cooldowns = new Collection();
   client.agent = agent;
   client.logger = logger;
+  client.observability = observability;
   return client;
 }
