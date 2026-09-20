@@ -13,7 +13,7 @@ const event: BotEvent<"messageCreate"> = {
       authorName: message.author.username,
       guildId: message.guildId ?? undefined,
       channelId: message.channelId,
-    });
+    }, Number(Bun.env.MAX_AGENT_ITERATIONS ?? 5));
     await message.reply({ content: response.slice(0, 2000), allowedMentions: { repliedUser: false } });
   },
 };

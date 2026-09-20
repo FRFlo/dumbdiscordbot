@@ -18,7 +18,7 @@ L’approche s’inspire d’**Hermes-Agent** : une boucle agentique reçoit le 
 
 - [Bun](https://bun.sh/) (`latest`) ;
 - un bot Discord créé dans le [Developer Portal](https://discord.com/developers/applications) ;
-- un serveur de modèle OpenAI-compatible. [Ollama](https://ollama.com/) est l’exemple local par défaut.
+- un serveur de modèle OpenAI-compatible. [Ollama](https://ollama.com/) est l’exemple local par défaut ; la couche IA est gérée par [TanStack AI](https://tanstack.com/ai).
 
 ## Démarrage du scaffold
 
@@ -34,6 +34,8 @@ Le démarrage charge les commandes et événements depuis `src/commands/` et `sr
 ## Configuration IA
 
 Les variables `OPENAI_BASE_URL`, `OPENAI_API_KEY` et `OPENAI_MODEL` permettent de cibler Ollama ou tout autre endpoint compatible. La valeur `ollama` pour la clé convient à un serveur local qui n’authentifie pas les requêtes ; utilise la clé exigée par ton provider en production.
+
+Le Code Mode de TanStack AI utilise QuickJS natif via Bun pour exécuter le code généré dans un isolate limité. Les paramètres de sécurité sont configurables dans `.env` avec les variables `CODE_MODE_*`.
 
 ## Documentation
 

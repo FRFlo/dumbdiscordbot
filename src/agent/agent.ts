@@ -1,46 +1,58 @@
-import type { ConversationContext, ChatMessage } from "../domain/types";
-import type { ModelProvider } from "../providers/model-provider";
-import { SafetyPolicy } from "../safety/policy";
-import { ToolRegistry } from "../tools/registry";
+import { chat, maxIterations, streamToText } from "@tanstack/ai";
+import { createCodeMode } from "@tanstack/ai-code-mode";
+import { createQuickJSBunIsolateDriver } from "@tanstack/ai-isolate-quickjs-bun";
+import { openaiCompatibleText } from "@tanstack/ai-openai/compatible";
+import type { AppConfig } from "../config";
+import type { ConversationContext } from "../domain/types";
 import type { Logger } from "../observability/logger";
+import { ToolRegistry } from "../tools/registry";
 
-const SYSTEM_PROMPT = "Tu es un assistant Discord utile. Utilise uniquement les tools disponibles et respecte les permissions.";
+const SYSTEM_PROMPT = [
+  "Tu es un assistant Discord utile et prudent.",
+  "Utilise les tools disponibles uniquement quand ils sont nécessaires.",
+  "Respecte toujours le contexte Discord et les permissions de l'utilisateur.",
+].join(" ");
 
 export class Agent {
+  private readonly adapter;
+  private readonly codeMode;
+
   public constructor(
-    private readonly provider: ModelProvider,
+    config: AppConfig,
     private readonly tools: ToolRegistry,
-    private readonly policy: SafetyPolicy,
     private readonly logger: Logger,
-    private readonly maxIterations: number,
-  ) {}
+  ) {
+    this.adapter = openaiCompatibleText(config.openAiModel, {
+      baseURL: config.openAiBaseUrl,
+      apiKey: config.openAiApiKey,
+    });
+    this.codeMode = createCodeMode({
+      driver: createQuickJSBunIsolateDriver({
+        timeout: config.codeModeTimeout,
+        memoryLimit: config.codeModeMemoryLimit,
+        maxStackSize: config.codeModeMaxStackSize,
+        maxToolCalls: config.codeModeMaxToolCalls,
+      }),
+      tools: [...this.tools.all()],
+      timeout: config.codeModeTimeout,
+      memoryLimit: config.codeModeMemoryLimit,
+    });
+  }
 
-  public async respond(context: ConversationContext): Promise<string> {
-    const messages: ChatMessage[] = [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: `${context.authorName}: ${context.content}` },
-    ];
-
-    for (let iteration = 0; iteration < this.maxIterations; iteration += 1) {
-      const completion = await this.provider.complete(messages, this.tools.definitions());
-      if (completion.toolCalls.length === 0) return completion.content || "Je n'ai pas de réponse à fournir.";
-
-      messages.push({ role: "assistant", content: completion.content, toolCalls: completion.toolCalls });
-      for (const call of completion.toolCalls) {
-        const tool = this.tools.definitions().find((definition) => definition.name === call.name);
-        if (!tool || !this.policy.canExecute(tool.risk)) {
-          messages.push({ role: "tool", toolCallId: call.id, content: "Tool refusé par la policy de sécurité." });
-          continue;
-        }
-        try {
-          const result = await this.tools.execute(call.name, JSON.parse(call.arguments), { conversation: context });
-          messages.push({ role: "tool", toolCallId: call.id, content: JSON.stringify(result) });
-        } catch (error) {
-          this.logger.warn("Échec d'exécution d'un tool", { tool: call.name, error: String(error) });
-          messages.push({ role: "tool", toolCallId: call.id, content: "Le tool a échoué." });
-        }
-      }
+  public async respond(context: ConversationContext, maxAgentIterations: number): Promise<string> {
+    try {
+      const stream = chat({
+        adapter: this.adapter,
+        messages: [{ role: "user", content: `${context.authorName}: ${context.content}` }],
+        systemPrompts: [SYSTEM_PROMPT, this.codeMode.systemPrompt],
+        tools: [...this.codeMode.tools],
+        context,
+        agentLoopStrategy: maxIterations(maxAgentIterations),
+      });
+      return (await streamToText(stream)) || "Je n'ai pas de réponse à fournir.";
+    } catch (error) {
+      this.logger.error("Échec de l'exécution TanStack AI", { error: String(error) });
+      return "Je n'ai pas pu traiter cette demande pour le moment.";
     }
-    return "Je n'ai pas pu terminer cette demande dans la limite autorisée.";
   }
 }

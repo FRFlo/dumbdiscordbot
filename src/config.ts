@@ -7,6 +7,10 @@ export interface AppConfig {
   openAiModel: string;
   logLevel: string;
   maxAgentIterations: number;
+  codeModeTimeout: number;
+  codeModeMemoryLimit: number;
+  codeModeMaxStackSize: number;
+  codeModeMaxToolCalls: number;
 }
 
 function required(name: string): string {
@@ -25,5 +29,9 @@ export function loadConfig(): AppConfig {
     openAiModel: Bun.env.OPENAI_MODEL ?? "qwen3:latest",
     logLevel: Bun.env.LOG_LEVEL ?? "info",
     maxAgentIterations: Number(Bun.env.MAX_AGENT_ITERATIONS ?? 5),
+    codeModeTimeout: Number(Bun.env.CODE_MODE_TIMEOUT ?? 30_000),
+    codeModeMemoryLimit: Number(Bun.env.CODE_MODE_MEMORY_LIMIT ?? 128),
+    codeModeMaxStackSize: Number(Bun.env.CODE_MODE_MAX_STACK_SIZE ?? 512 * 1024),
+    codeModeMaxToolCalls: Number(Bun.env.CODE_MODE_MAX_TOOL_CALLS ?? 100),
   };
 }

@@ -5,9 +5,9 @@
 Le bot sera organisé autour de cinq frontières :
 
 1. **Discord adapter** : transforme les messages et événements Discord en entrées normalisées ;
-2. **Agent loop** : construit le contexte, appelle le modèle et orchestre les tool calls ;
-3. **Model provider** : client OpenAI-compatible configurable par variables d’environnement ;
-4. **Tool registry** : expose des tools typés, validés et documentés au modèle ;
+2. **Agent loop** : TanStack AI construit le contexte, gère le streaming et orchestre les tool calls ;
+3. **Model provider** : adaptateur `openaiCompatibleText` de TanStack AI, configurable par variables d’environnement ;
+4. **Tool registry** : expose des server tools TanStack AI typés, validés et documentés au modèle ;
 5. **Policies and observability** : permissions, confirmations, journaux, métriques et traçabilité.
 
 ## Organisation des fichiers Discord
@@ -48,6 +48,12 @@ La boucle ne doit jamais donner au modèle un accès implicite à Discord, au sy
 ```
 
 Chaque exécution doit avoir une limite de temps, une limite d’itérations et une taille maximale de contexte. Les erreurs de tools doivent être retournées comme données contrôlées, jamais comme stack traces au modèle ou à l’utilisateur.
+
+## TanStack AI et Code Mode
+
+Toute la couche IA passe par `@tanstack/ai`. Le provider `openaiCompatibleText` permet d’utiliser Ollama, vLLM, LM Studio ou un autre endpoint compatible sans dépendre directement du SDK OpenAI dans le code applicatif.
+
+Les tools Discord seront déclarés avec `toolDefinition()` et implémentés côté serveur avec `.server()`. `createCodeMode()` les expose au modèle sous forme de fonctions TypeScript orchestrables. Le code généré est exécuté dans un isolate QuickJS natif Bun via `@tanstack/ai-isolate-quickjs-bun`, sans accès direct au filesystem, au réseau ou au processus hôte. Les limites `CODE_MODE_TIMEOUT`, `CODE_MODE_MEMORY_LIMIT`, `CODE_MODE_MAX_STACK_SIZE` et `CODE_MODE_MAX_TOOL_CALLS` doivent rester configurées en production.
 
 ## Providers
 
