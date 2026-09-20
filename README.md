@@ -111,6 +111,7 @@ Pour utiliser Ollama installé sur la machine hôte depuis Docker Desktop, défi
 ## Documentation
 
 - [Architecture et principes](docs/ARCHITECTURE.md)
+- [Tools Discord](docs/TOOLS.md)
 - [Contribuer](CONTRIBUTING.md)
 - [Sécurité](SECURITY.md)
 - [Code de conduite](CODE_OF_CONDUCT.md)

@@ -9,6 +9,7 @@ import type { Logger } from "../observability/logger";
 import type { PostHogObservability } from "../observability/posthog";
 import { ToolRegistry } from "../tools/registry";
 import type { ApprovalManager } from "../discord/approval";
+import { discordContextStorage } from "../tools/discord-runtime";
 
 const SYSTEM_PROMPT = [
   "Tu es un assistant Discord utile et prudent.",
@@ -16,7 +17,7 @@ const SYSTEM_PROMPT = [
   "Respecte toujours le contexte Discord et les permissions de l'utilisateur.",
   "Lors d'un follow-up sans mention, réponds uniquement [SILENT] si le message ne s'adresse pas à toi.",
   "Si tu réponds [SILENT], n'ajoute aucun autre caractère ni explication.",
-  "Dans execute_typescript, utilise approval({ description, timeoutMs? }) avant toute action Discord sensible et attends son résultat avec await.",
+  "Dans execute_typescript, utilise approval({ description, timeoutMs? }) avant une action Discord destructrice, irréversible ou à fort impact lorsque tu juges cette approbation nécessaire, puis attends son résultat avec await. Les lectures et actions réversibles usuelles ne doivent pas demander d'approbation par défaut.",
 ].join(" ");
 
 function exposeLocalApproval(driver: IsolateDriver): IsolateDriver {
@@ -92,7 +93,7 @@ export class Agent {
   }
 
   public async respond(context: ConversationContext, maxAgentIterations: number): Promise<string> {
-    return this.approvals.run(context, async () => {
+    return discordContextStorage.run(context, () => this.approvals.run(context, async () => {
       const runId = crypto.randomUUID();
       const distinctId = `discord:${context.authorId}`;
       const sessionId = `discord:${context.guildId ?? "dm"}:${context.channelId}`;
@@ -151,6 +152,6 @@ export class Agent {
         });
         return "Je n'ai pas pu traiter cette demande pour le moment.";
       }
-    });
+    }));
   }
 }

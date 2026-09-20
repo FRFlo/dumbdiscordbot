@@ -1,4 +1,4 @@
-import { Client, Collection, GatewayIntentBits } from "discord.js";
+import { Client, Collection, GatewayIntentBits, Partials } from "discord.js";
 import type { Agent } from "../agent/agent";
 import type { AppConfig } from "../config";
 import type { Logger } from "../observability/logger";
@@ -12,8 +12,13 @@ export function createDiscordClient(agent: Agent, logger: Logger, observability:
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildModeration,
+      GatewayIntentBits.GuildScheduledEvents,
+      GatewayIntentBits.GuildMessageReactions,
       GatewayIntentBits.DirectMessages,
     ],
+    partials: [Partials.Channel, Partials.Message, Partials.Reaction],
   });
   client.commands = new Collection();
   client.buttons = new Collection();

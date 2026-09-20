@@ -6,15 +6,18 @@ import { PostHogObservability } from "./observability/posthog";
 import { ToolRegistry } from "./tools/registry";
 import { ApprovalManager } from "./discord/approval";
 import { createApprovalTool } from "./tools/approval";
+import { discordRuntime } from "./tools/discord-runtime";
 
 const config = loadConfig();
 const observability = new PostHogObservability(config, logger);
+const approvals = new ApprovalManager(config.approvalTimeoutMs);
+discordRuntime.approvals = approvals;
 const tools = new ToolRegistry();
 await tools.loadFromDirectory();
-const approvals = new ApprovalManager(config.approvalTimeoutMs);
 tools.register(createApprovalTool(approvals));
 const agent = new Agent(config, tools, logger, observability, approvals);
 const discord = new DiscordAdapter(config, agent, logger, observability, approvals);
+discordRuntime.client = discord.client;
 approvals.attachClient(discord.client);
 
 let shuttingDown = false;
