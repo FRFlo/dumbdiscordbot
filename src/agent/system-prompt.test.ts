@@ -31,5 +31,7 @@ describe("system prompt", () => {
 		expect(SYSTEM_PROMPT).toContain("approvalToken");
 		expect(SYSTEM_PROMPT).toContain("[SILENT]");
 		expect(SYSTEM_PROMPT).toContain("au lieu de deviner");
+		expect(SYSTEM_PROMPT).toContain("Préfère toujours le déterminisme");
+		expect(SYSTEM_PROMPT).toContain("Intl.DateTimeFormat");
 	});
 });
