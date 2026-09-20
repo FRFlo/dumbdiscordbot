@@ -1,5 +1,6 @@
 import { chat, maxIterations } from "@tanstack/ai";
 import { createCodeMode } from "@tanstack/ai-code-mode";
+import { createQuickJSIsolateDriver } from "@tanstack/ai-isolate-quickjs";
 import { createQuickJSBunIsolateDriver } from "@tanstack/ai-isolate-quickjs-bun";
 import { openaiCompatibleText } from "@tanstack/ai-openai/compatible";
 import type { AppConfig } from "../config";
@@ -15,6 +16,23 @@ const SYSTEM_PROMPT = [
   "Lors d'un follow-up sans mention, réponds uniquement [SILENT] si le message ne s'adresse pas à toi.",
   "Si tu réponds [SILENT], n'ajoute aucun autre caractère ni explication.",
 ].join(" ");
+
+function createIsolateDriver(config: AppConfig, logger: Logger) {
+  const isWindowsWithoutNativeLibrary = process.platform === "win32" && !Bun.env.QUICKJS_BUN_NATIVE_LIBRARY;
+  if (isWindowsWithoutNativeLibrary) {
+    logger.warn("QuickJS Bun natif indisponible sous Windows : fallback vers QuickJS WASM");
+    return createQuickJSIsolateDriver({
+      timeout: config.codeModeTimeout,
+      memoryLimit: config.codeModeMemoryLimit,
+    });
+  }
+  return createQuickJSBunIsolateDriver({
+    timeout: config.codeModeTimeout,
+    memoryLimit: config.codeModeMemoryLimit,
+    maxStackSize: config.codeModeMaxStackSize,
+    maxToolCalls: config.codeModeMaxToolCalls,
+  });
+}
 
 export class Agent {
   private readonly adapter;
@@ -33,12 +51,7 @@ export class Agent {
       apiKey: config.openAiApiKey,
     });
     this.codeMode = createCodeMode({
-      driver: createQuickJSBunIsolateDriver({
-        timeout: config.codeModeTimeout,
-        memoryLimit: config.codeModeMemoryLimit,
-        maxStackSize: config.codeModeMaxStackSize,
-        maxToolCalls: config.codeModeMaxToolCalls,
-      }),
+      driver: createIsolateDriver(config, logger),
       tools: [...this.tools.all()],
       timeout: config.codeModeTimeout,
       memoryLimit: config.codeModeMemoryLimit,

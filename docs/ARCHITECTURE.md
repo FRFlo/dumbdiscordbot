@@ -74,6 +74,8 @@ Toute la couche IA passe par `@tanstack/ai`. Le provider `openaiCompatibleText` 
 
 Les tools Discord seront déclarés avec `toolDefinition()` et implémentés côté serveur avec `.server()`. `createCodeMode()` les expose au modèle sous forme de fonctions TypeScript orchestrables. Le code généré est exécuté dans un isolate QuickJS natif Bun via `@tanstack/ai-isolate-quickjs-bun`, sans accès direct au filesystem, au réseau ou au processus hôte. Les limites `CODE_MODE_TIMEOUT`, `CODE_MODE_MEMORY_LIMIT`, `CODE_MODE_MAX_STACK_SIZE` et `CODE_MODE_MAX_TOOL_CALLS` doivent rester configurées en production.
 
+Le driver natif Bun nécessite une DLL compilée manuellement sous Windows. Si `QUICKJS_BUN_NATIVE_LIBRARY` est absente, l’application bascule automatiquement vers `@tanstack/ai-isolate-quickjs` (WASM), avec les limites de temps et mémoire conservées. Pour utiliser exactement le driver natif sous Windows sans gérer cette DLL, lancer l’image Linux via Podman (`podman build -t dumbdiscordbot . && podman run --env-file .env dumbdiscordbot`).
+
 ## Providers
 
 Le code dépend d’une interface OpenAI-compatible, pas d’un fournisseur concret. `OPENAI_BASE_URL` et `OPENAI_MODEL` permettent de passer d’Ollama en local à un endpoint hébergé sans modifier la logique métier.

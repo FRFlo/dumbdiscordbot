@@ -37,6 +37,15 @@ Les variables `OPENAI_BASE_URL`, `OPENAI_API_KEY` et `OPENAI_MODEL` permettent d
 
 Le Code Mode de TanStack AI utilise QuickJS natif via Bun pour exécuter le code généré dans un isolate limité. Les paramètres de sécurité sont configurables dans `.env` avec les variables `CODE_MODE_*`.
 
+Sous macOS et Linux, le driver natif fonctionne directement. Sous Windows, le projet utilise automatiquement le driver QuickJS WASM portable, sauf si `QUICKJS_BUN_NATIVE_LIBRARY` pointe vers une DLL QuickJS compilée manuellement. Pour conserver le driver natif sans compiler de DLL, lance le bot dans l’image Linux avec Podman :
+
+```bash
+podman build -t dumbdiscordbot .
+podman run --env-file .env dumbdiscordbot
+```
+
+Le conteneur reste recommandé pour la production et permet de conserver les limites natives `maxStackSize` et `maxToolCalls` du driver Bun.
+
 ## Observabilité PostHog
 
 L’observabilité PostHog est activée lorsque `POSTHOG_API_KEY` est renseignée. Elle utilise les événements natifs [AI Observability](https://posthog.com/docs/ai-observability) (`$ai_trace`, `$ai_generation`, `$ai_span`) et [MCP Analytics](https://posthog.com/docs/mcp-analytics) (`$mcp_tool_call`) pour relier chaque demande Discord, génération et tool call dans une même trace. Les prompts, réponses et payloads de tools sont masqués par défaut.

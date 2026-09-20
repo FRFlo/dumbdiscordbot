@@ -4,6 +4,13 @@ FROM oven/bun:1.3.14-slim
 WORKDIR /app
 ENV NODE_ENV=production
 
+# quickjs-bun compile son bridge natif au premier usage et a besoin des headers C
+# même si Bun embarque TinyCC (notamment stdlib.h sur l'image slim).
+USER root
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libc6-dev \
+  && rm -rf /var/lib/apt/lists/*
+
 # Installer uniquement les dépendances nécessaires à l'exécution.
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
