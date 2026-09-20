@@ -1,5 +1,5 @@
 import { chat, maxIterations } from "@tanstack/ai";
-import { createCodeMode, type IsolateDriver, type ToolBinding } from "@tanstack/ai-code-mode";
+import { createCodeMode } from "@tanstack/ai-code-mode";
 import { createQuickJSIsolateDriver } from "@tanstack/ai-isolate-quickjs";
 import { createQuickJSBunIsolateDriver } from "@tanstack/ai-isolate-quickjs-bun";
 import { openaiCompatibleText } from "@tanstack/ai-openai/compatible";
@@ -18,30 +18,6 @@ const SYSTEM_PROMPT = [
 	"Réponds toujours à la requête, y compris après l'utilisation de tools, en indiquant clairement et brièvement ce que tu as fait et le résultat obtenu.",
 	"Dans execute_typescript, pour une opération ultra sensible ou une séquence liée, appelle approval({ description, actions: [{ action, targetIds }], timeoutMs? }) une seule fois avec toutes les actions et les listes exactes de cibles. Décris clairement toute la séquence à l'utilisateur. Si approved est vrai, transmets approvalToken: token à chaque tool sensible correspondant. Les tools destructifs refusent toute action ou cible absente de ce jeton. Les lectures et actions réversibles usuelles ne demandent pas d'approbation.",
 ].join(" ");
-
-function exposeLocalApproval(driver: IsolateDriver): IsolateDriver {
-	return {
-		createContext: async (config) => {
-			const bindings: Record<string, ToolBinding> = {};
-			for (const [bindingName, binding] of Object.entries(config.bindings)) {
-				const localName = bindingName.startsWith("external_")
-					? bindingName.slice("external_".length)
-					: bindingName;
-				if (bindings[localName])
-					throw new Error(`Nom de binding Code Mode dupliqué : ${localName}`);
-				bindings[localName] = { ...binding, name: localName };
-			}
-			return driver.createContext({
-				...config,
-				bindings,
-			});
-		},
-	};
-}
-
-function removeExternalPrefix(value: string): string {
-	return value.replaceAll("external_", "");
-}
 
 function createIsolateDriver(config: AppConfig, logger: Logger) {
 	const isWindowsWithoutNativeLibrary =
@@ -81,17 +57,14 @@ export class Agent {
 			apiKey: config.openAiApiKey,
 		});
 		this.codeMode = createCodeMode({
-			driver: exposeLocalApproval(createIsolateDriver(config, logger)),
+			driver: createIsolateDriver(config, logger),
 			tools: [...this.tools.all()],
 			lazyToolsConfig: { includeDescription: "first-sentence" },
 			timeout: config.codeModeTimeout,
 			memoryLimit: config.codeModeMemoryLimit,
 		});
-		this.codeModeTools = this.codeMode.tools.map((tool) => ({
-			...tool,
-			description: removeExternalPrefix(tool.description),
-		}));
-		this.codeModeSystemPrompt = removeExternalPrefix(this.codeMode.systemPrompt);
+		this.codeModeTools = this.codeMode.tools;
+		this.codeModeSystemPrompt = this.codeMode.systemPrompt;
 	}
 
 	public async respond(context: ConversationContext, maxAgentIterations: number): Promise<string> {
