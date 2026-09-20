@@ -13,6 +13,8 @@ export interface AppConfig {
   codeModeMaxToolCalls: number;
   posthogApiKey?: string;
   posthogHost: string;
+  posthogCaptureAiContent: boolean;
+  posthogCaptureToolPayloads: boolean;
 }
 
 function required(name: string): string {
@@ -37,5 +39,7 @@ export function loadConfig(): AppConfig {
     codeModeMaxToolCalls: Number(Bun.env.CODE_MODE_MAX_TOOL_CALLS ?? 100),
     posthogApiKey: Bun.env.POSTHOG_API_KEY?.trim() || undefined,
     posthogHost: Bun.env.POSTHOG_HOST ?? "https://us.i.posthog.com",
+    posthogCaptureAiContent: Bun.env.POSTHOG_CAPTURE_AI_CONTENT === "true",
+    posthogCaptureToolPayloads: Bun.env.POSTHOG_CAPTURE_TOOL_PAYLOADS === "true",
   };
 }

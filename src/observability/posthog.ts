@@ -8,6 +8,9 @@ interface AiRunMetadata {
   provider: string;
   guildId?: string;
   channelId: string;
+  sessionId: string;
+  intent: string;
+  input: string;
   toolCount: number;
 }
 
@@ -15,15 +18,27 @@ interface StreamChunk {
   type?: string;
   delta?: string;
   toolName?: string;
+  toolCallName?: string;
   toolCallId?: string;
+  input?: unknown;
+  content?: string;
   finishReason?: string;
 }
 
-/** Télémétrie applicative et IA, sans capturer les prompts par défaut. */
+interface ToolCallState {
+  name: string;
+  startedAt: number;
+  input?: unknown;
+}
+
+/** Télémétrie PostHog AI Observability et MCP Analytics. */
 export class PostHogObservability {
   private readonly client?: PostHog;
 
-  public constructor(config: AppConfig, private readonly logger: Logger) {
+  public constructor(
+    private readonly config: AppConfig,
+    private readonly logger: Logger,
+  ) {
     if (!config.posthogApiKey) {
       logger.info("PostHog désactivé : POSTHOG_API_KEY absent");
       return;
@@ -47,10 +62,16 @@ export class PostHogObservability {
   }
 
   public captureAiStarted(runId: string, metadata: AiRunMetadata): void {
-    this.capture("ai_run_started", metadata.distinctId, {
-      run_id: runId,
-      provider: metadata.provider,
+    this.capture("$ai_trace", metadata.distinctId, {
+      $ai_trace_id: runId,
+      $ai_session_id: metadata.sessionId,
+      $ai_span_name: "discord_agent",
+      $ai_input_state: this.config.posthogCaptureAiContent
+        ? { content: metadata.input }
+        : { content_length: metadata.input.length },
+      $ai_is_error: false,
       model: metadata.model,
+      provider: metadata.provider,
       guild_id: metadata.guildId,
       channel_id: metadata.channelId,
       tool_count: metadata.toolCount,
@@ -58,48 +79,119 @@ export class PostHogObservability {
   }
 
   public captureAiCompleted(runId: string, distinctId: string, properties: Record<string, unknown>): void {
-    this.capture("ai_run_completed", distinctId, { run_id: runId, ...properties });
+    this.capture("$ai_generation", distinctId, {
+      $ai_trace_id: runId,
+      $ai_session_id: properties.session_id,
+      $ai_span_name: "discord_agent_response",
+      $ai_model: properties.model,
+      $ai_provider: "openai-compatible",
+      $ai_latency: Number(properties.duration_ms ?? 0) / 1000,
+      $ai_stream: true,
+      $ai_input: this.config.posthogCaptureAiContent
+        ? [{ role: "user", content: properties.input }]
+        : [{ role: "user", content: "[redacted]" }],
+      $ai_output_choices: this.config.posthogCaptureAiContent
+        ? [{ role: "assistant", content: properties.response }]
+        : [{ role: "assistant", content: "[redacted]" }],
+      $ai_is_error: false,
+      $ai_stop_reason: properties.finish_reason,
+      $ai_tools: properties.tool_calls,
+      discord_channel_id: properties.channel_id,
+    });
   }
 
-  public captureAiFailed(runId: string, distinctId: string, error: unknown): void {
-    this.client?.captureException(error, distinctId, { ai_run_id: runId });
-    this.capture("ai_run_failed", distinctId, { run_id: runId, error_type: error instanceof Error ? error.name : typeof error });
+  public captureAiFailed(runId: string, distinctId: string, error: unknown, metadata: Record<string, unknown> = {}): void {
+    const message = error instanceof Error ? error.message : String(error);
+    this.capture("$ai_generation", distinctId, {
+      $ai_trace_id: runId,
+      $ai_session_id: metadata.session_id,
+      $ai_model: metadata.model,
+      $ai_provider: "openai-compatible",
+      $ai_is_error: true,
+      $ai_error: message,
+      $ai_latency: Number(metadata.duration_ms ?? 0) / 1000,
+    });
+    this.client?.captureException(error, distinctId, { $ai_trace_id: runId });
   }
 
-  /** Consomme un stream TanStack AI tout en observant les étapes importantes. */
+  /** Observe les étapes TanStack AI et les publie dans les traces PostHog. */
   public async observeAiStream(
     stream: AsyncIterable<unknown>,
     runId: string,
     distinctId: string,
-  ): Promise<string> {
+    metadata: { sessionId: string; model: string; intent: string },
+  ): Promise<{ response: string; toolCalls: string[]; finishReason?: string }> {
     let response = "";
-    let toolCalls = 0;
+    let finishReason: string | undefined;
+    const toolCalls: string[] = [];
+    const pending = new Map<string, ToolCallState>();
+
     for await (const value of stream) {
       const chunk = value as StreamChunk;
       if (chunk.type === "TEXT_MESSAGE_CONTENT") response += chunk.delta ?? "";
+      if (chunk.type === "RUN_FINISHED") finishReason = chunk.finishReason;
       if (chunk.type === "TOOL_CALL_START") {
-        toolCalls += 1;
-        this.capture("ai_tool_call_started", distinctId, {
-          run_id: runId,
-          tool_name: chunk.toolName,
-          tool_call_id: chunk.toolCallId,
-        });
+        const id = chunk.toolCallId ?? crypto.randomUUID();
+        pending.set(id, { name: chunk.toolCallName ?? chunk.toolName ?? "unknown", startedAt: Date.now() });
+        toolCalls.push(chunk.toolCallName ?? chunk.toolName ?? "unknown");
       }
-      if (chunk.type === "TOOL_CALL_END") {
-        this.capture("ai_tool_call_finished", distinctId, {
-          run_id: runId,
-          tool_call_id: chunk.toolCallId,
-        });
+      if (chunk.type === "TOOL_CALL_END" && chunk.toolCallId) {
+        const call = pending.get(chunk.toolCallId);
+        if (call) call.input = chunk.input;
       }
-      if (chunk.type === "RUN_FINISHED") {
-        this.capture("ai_run_finished", distinctId, {
-          run_id: runId,
-          finish_reason: chunk.finishReason,
-          tool_calls: toolCalls,
-        });
+      if (chunk.type === "TOOL_CALL_RESULT" && chunk.toolCallId) {
+        const call = pending.get(chunk.toolCallId);
+        if (call) {
+          this.captureToolCall(runId, distinctId, metadata, chunk.toolCallId, call, chunk.content, false);
+          pending.delete(chunk.toolCallId);
+        }
       }
     }
-    return response;
+    for (const [id, call] of pending) {
+      this.captureToolCall(runId, distinctId, metadata, id, call, undefined, false);
+    }
+    return { response, toolCalls, finishReason };
+  }
+
+  private captureToolCall(
+    runId: string,
+    distinctId: string,
+    metadata: { sessionId: string; model: string; intent: string },
+    toolCallId: string,
+    call: ToolCallState,
+    output: unknown,
+    isError: boolean,
+  ): void {
+    const durationMs = Date.now() - call.startedAt;
+    const payload = this.config.posthogCaptureToolPayloads ? call.input : { redacted: true };
+    const result = this.config.posthogCaptureToolPayloads ? output : { redacted: true };
+    this.capture("$ai_span", distinctId, {
+      $ai_trace_id: runId,
+      $ai_session_id: metadata.sessionId,
+      $ai_span_id: toolCallId,
+      $ai_parent_id: runId,
+      $ai_span_name: `tool:${call.name}`,
+      $ai_input_state: payload,
+      $ai_output_state: result,
+      $ai_latency: durationMs / 1000,
+      $ai_is_error: isError,
+    });
+    this.capture("$mcp_tool_call", distinctId, {
+      $mcp_source: "posthog_mcp_analytics",
+      $mcp_server_name: "dumbdiscordbot-code-mode",
+      $mcp_tool_name: call.name,
+      $mcp_parameters: payload,
+      $mcp_response: result,
+      $mcp_duration_ms: durationMs,
+      $mcp_is_error: isError,
+      $mcp_llm_model: metadata.model,
+      $mcp_llm_model_source: "self_reported",
+      $mcp_conversation_id: metadata.sessionId,
+      $ai_trace_id: runId,
+      ...(this.config.posthogCaptureAiContent
+        ? { $mcp_intent: metadata.intent, $mcp_intent_source: "inferred" }
+        : {}),
+    });
   }
 
   public async shutdown(): Promise<void> {

@@ -46,6 +46,7 @@ export class Agent {
   public async respond(context: ConversationContext, maxAgentIterations: number): Promise<string> {
     const runId = crypto.randomUUID();
     const distinctId = `discord:${context.authorId}`;
+    const sessionId = `discord:${context.guildId ?? "dm"}:${context.channelId}`;
     const startedAt = Date.now();
     this.observability.captureAiStarted(runId, {
       distinctId,
@@ -53,6 +54,9 @@ export class Agent {
       provider: "openai-compatible",
       guildId: context.guildId,
       channelId: context.channelId,
+      sessionId,
+      intent: context.content,
+      input: context.content,
       toolCount: this.codeMode.tools.length,
     });
     try {
@@ -64,15 +68,31 @@ export class Agent {
         context,
         agentLoopStrategy: maxIterations(maxAgentIterations),
       });
-      const response = (await this.observability.observeAiStream(stream, runId, distinctId)) || "Je n'ai pas de réponse à fournir.";
+      const observed = await this.observability.observeAiStream(stream, runId, distinctId, {
+        sessionId,
+        model: this.model,
+        intent: context.content,
+      });
+      const response = observed.response || "Je n'ai pas de réponse à fournir.";
       this.observability.captureAiCompleted(runId, distinctId, {
         duration_ms: Date.now() - startedAt,
         response_chars: response.length,
+        response,
+        input: context.content,
+        model: this.model,
+        session_id: sessionId,
+        channel_id: context.channelId,
+        finish_reason: observed.finishReason,
+        tool_calls: observed.toolCalls,
       });
       return response;
     } catch (error) {
       this.logger.error("Échec de l'exécution TanStack AI", { error: String(error) });
-      this.observability.captureAiFailed(runId, distinctId, error);
+      this.observability.captureAiFailed(runId, distinctId, error, {
+        model: this.model,
+        session_id: sessionId,
+        duration_ms: Date.now() - startedAt,
+      });
       return "Je n'ai pas pu traiter cette demande pour le moment.";
     }
   }

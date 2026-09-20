@@ -39,14 +39,16 @@ Le Code Mode de TanStack AI utilise QuickJS natif via Bun pour exécuter le code
 
 ## Observabilité PostHog
 
-L’observabilité PostHog est activée lorsque `POSTHOG_API_KEY` est renseignée. Elle suit les exécutions IA, les appels de tools, les durées, les erreurs et les erreurs globales de l’application. Les prompts et réponses ne sont pas envoyés par défaut ; seuls des métadonnées et compteurs sont capturés.
+L’observabilité PostHog est activée lorsque `POSTHOG_API_KEY` est renseignée. Elle utilise les événements natifs [AI Observability](https://posthog.com/docs/ai-observability) (`$ai_trace`, `$ai_generation`, `$ai_span`) et [MCP Analytics](https://posthog.com/docs/mcp-analytics) (`$mcp_tool_call`) pour relier chaque demande Discord, génération et tool call dans une même trace. Les prompts, réponses et payloads de tools sont masqués par défaut.
 
 ```bash
 POSTHOG_API_KEY=phc_...
 POSTHOG_HOST=https://us.i.posthog.com
+POSTHOG_CAPTURE_AI_CONTENT=false
+POSTHOG_CAPTURE_TOOL_PAYLOADS=false
 ```
 
-Pour PostHog Cloud Europe, utilise `https://eu.i.posthog.com`. Le client est flushé lors de l’arrêt du bot. Consulte [la documentation d’architecture](docs/ARCHITECTURE.md) pour les événements suivis et les choix de confidentialité.
+Pour PostHog Cloud Europe, utilise `https://eu.i.posthog.com`. Les deux variables `POSTHOG_CAPTURE_*` peuvent être activées après revue des données sensibles. Le client est flushé lors de l’arrêt du bot. Consulte [la documentation d’architecture](docs/ARCHITECTURE.md) pour les événements suivis et les choix de confidentialité.
 
 ## Déploiement Docker
 

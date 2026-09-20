@@ -90,7 +90,9 @@ Le contexte doit être limité au serveur, au salon et à la conversation néces
 
 Les logs structurés et PostHog permettent de relier une requête Discord, un appel modèle et chaque tool call via un identifiant de corrélation, sans enregistrer les secrets ni le contenu sensible par défaut.
 
-Les événements PostHog principaux sont `ai_run_started`, `ai_run_finished`, `ai_run_completed`, `ai_run_failed`, `ai_tool_call_started`, `ai_tool_call_finished` et les exceptions applicatives. Ils contiennent le modèle, les durées, les identifiants Discord nécessaires au diagnostic et des compteurs, mais jamais le prompt ou la réponse. PostHog est désactivé si `POSTHOG_API_KEY` est vide ; `disableGeoip` est activé.
+PostHog utilise les événements natifs AI Observability : `$ai_trace` pour la demande agentique, `$ai_generation` pour la réponse du modèle et `$ai_span` pour chaque tool call. Les tools sont également publiés comme `$mcp_tool_call`, avec le nom, la durée, le statut, le modèle et l’intention utilisateur afin d’être visibles dans MCP Analytics. Le projet ne fournit pas encore de serveur MCP : ces événements appliquent le contrat MCP Analytics aux tools internes Code Mode pour observer leur usage de la même manière.
+
+La corrélation utilise `$ai_trace_id`, `$ai_session_id` et `$mcp_conversation_id`. Les contenus sont masqués par défaut. `POSTHOG_CAPTURE_AI_CONTENT=true` capture le texte de la réponse et de la demande ; `POSTHOG_CAPTURE_TOOL_PAYLOADS=true` capture les arguments et résultats des tools. Ces options doivent être activées uniquement après revue de la confidentialité. PostHog est désactivé si `POSTHOG_API_KEY` est vide ; `disableGeoip` est activé.
 
 ## Exécution et déploiement
 
