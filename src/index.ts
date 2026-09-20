@@ -10,7 +10,7 @@ import { discordRuntime } from "./tools/discord-runtime";
 
 const config = loadConfig();
 const observability = new PostHogObservability(config, logger);
-const approvals = new ApprovalManager(config.approvalTimeoutMs);
+const approvals = new ApprovalManager(config.approvalTimeoutMs, config.approvalTokenTtlMs);
 discordRuntime.approvals = approvals;
 const tools = new ToolRegistry();
 await tools.loadFromDirectory();

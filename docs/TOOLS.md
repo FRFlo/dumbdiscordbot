@@ -29,8 +29,12 @@ ban, kick, unban, suppression groupée et départ d'un serveur.
 
 Pour les actions sensibles mais réversibles, le modèle peut appeler le tool
 `approval` dans le code TypeScript généré lorsqu'il estime qu'une confirmation
-utilisateur est nécessaire. Le prompt agentique lui demande explicitement de
-ne pas demander d'approbation par défaut pour les lectures et actions courantes.
+utilisateur est nécessaire. Une approbation renvoie un jeton éphémère limité à
+une action et à la liste exacte des cibles. Le même `approvalToken` peut donc
+être transmis à plusieurs appels du même tool sans afficher une nouvelle
+demande Discord. Chaque tool vérifie et consomme sa cible individuellement.
+Le prompt agentique lui demande explicitement de ne pas demander d'approbation
+par défaut pour les lectures et actions courantes.
 
 ## Isolation
 

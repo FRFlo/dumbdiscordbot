@@ -14,6 +14,7 @@ export interface AppConfig {
   codeModeMaxStackSize: number;
   codeModeMaxToolCalls: number;
   approvalTimeoutMs: number;
+  approvalTokenTtlMs: number;
   posthogApiKey?: string;
   posthogHost: string;
   posthogCaptureAiContent: boolean;
@@ -42,7 +43,8 @@ export function loadConfig(): AppConfig {
     codeModeMemoryLimit: Number(Bun.env.CODE_MODE_MEMORY_LIMIT ?? 128),
     codeModeMaxStackSize: Number(Bun.env.CODE_MODE_MAX_STACK_SIZE ?? 512 * 1024),
     codeModeMaxToolCalls: Number(Bun.env.CODE_MODE_MAX_TOOL_CALLS ?? 100),
-    approvalTimeoutMs: Number(Bun.env.APPROVAL_TIMEOUT_MS ?? 20_000),
+    approvalTimeoutMs: Number(Bun.env.APPROVAL_TIMEOUT_MS ?? 120_000),
+    approvalTokenTtlMs: Number(Bun.env.APPROVAL_TOKEN_TTL_MS ?? 120_000),
     posthogApiKey: Bun.env.POSTHOG_API_KEY?.trim() || undefined,
     posthogHost: Bun.env.POSTHOG_HOST ?? "https://us.i.posthog.com",
     posthogCaptureAiContent: Bun.env.POSTHOG_CAPTURE_AI_CONTENT === "true",

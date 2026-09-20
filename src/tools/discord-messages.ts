@@ -5,7 +5,7 @@ import { approve, ensureChannelInContext, requireChannel, requireGuild } from ".
 import { messageSummary } from "./discord-helpers";
 
 type Exec = { context?: ConversationContext };
-const messageInput = z.object({ channelId: z.string(), messageId: z.string() });
+const messageInput = z.object({ channelId: z.string(), messageId: z.string(), approvalToken: z.string().optional() });
 const output = z.object({ id: z.string(), channelId: z.string(), guildId: z.string().nullable(), author: z.object({ id: z.string(), username: z.string(), bot: z.boolean() }).nullable(), content: z.string(), createdAt: z.string(), url: z.string(), attachments: z.array(z.object({ id: z.string(), name: z.string().nullable(), url: z.string(), size: z.number() })) });
 
 const get = toolDefinition({ name: "get_message", description: "Récupère un message Discord précis.", inputSchema: messageInput, outputSchema: output });
@@ -16,7 +16,7 @@ const reply = toolDefinition({ name: "reply_to_message", description: "Répond �
 const edit = toolDefinition({ name: "edit_message", description: "Modifie un message envoyé par le bot après approbation.", inputSchema: z.object({ channelId: z.string(), messageId: z.string(), content: z.string().min(1).max(2_000) }), outputSchema: output });
 const remove = toolDefinition({ name: "delete_message", description: "Supprime un message après approbation.", inputSchema: messageInput, outputSchema: z.object({ deleted: z.boolean(), id: z.string() }) });
 const pin = toolDefinition({ name: "pin_message", description: "Épingle ou désépingle un message après approbation.", inputSchema: messageInput.extend({ pinned: z.boolean() }), outputSchema: z.object({ id: z.string(), pinned: z.boolean() }) });
-const bulkDelete = toolDefinition({ name: "bulk_delete_messages", description: "Supprime plusieurs messages récents après approbation.", inputSchema: z.object({ channelId: z.string(), messageIds: z.array(z.string()).min(2).max(100) }), outputSchema: z.object({ deleted: z.number() }) });
+const bulkDelete = toolDefinition({ name: "bulk_delete_messages", description: "Supprime plusieurs messages récents après approbation groupée.", inputSchema: z.object({ channelId: z.string(), messageIds: z.array(z.string()).min(2).max(100), approvalToken: z.string().optional() }), outputSchema: z.object({ deleted: z.number() }) });
 
 async function fetchMessage(channelId: string, context: ConversationContext | undefined, guildId?: string) { const guild = requireGuild(context, guildId); ensureChannelInContext(context, channelId); const channel = requireChannel(guild, channelId); if (!("messages" in channel)) throw new Error("Ce salon ne permet pas la lecture des messages."); return channel.messages; }
 
@@ -27,8 +27,8 @@ export default [
   send.server(async ({ channelId, content }, execution: Exec) => { const context = execution.context; const guild = requireGuild(context); const channel = requireChannel(guild, channelId); if (!("send" in channel)) throw new Error("Salon non textuel."); return messageSummary(await channel.send({ content })); }),
   reply.server(async ({ channelId, messageId, content }, execution: Exec) => { const messages = await fetchMessage(channelId, execution.context); return messageSummary(await messages.fetch(messageId).then((message) => message.reply({ content }))); }),
   edit.server(async ({ channelId, messageId, content }, execution: Exec) => { const messages = await fetchMessage(channelId, execution.context); return messageSummary(await messages.fetch(messageId).then((message) => message.edit({ content }))); }),
-  remove.server(async ({ channelId, messageId }, execution: Exec) => { await approve(`Supprimer le message ${messageId}`); const messages = await fetchMessage(channelId, execution.context); const message = await messages.fetch(messageId); await message.delete(); return { deleted: true, id: messageId }; }),
+  remove.server(async ({ channelId, messageId, approvalToken }, execution: Exec) => { await approve("delete_message", [messageId], approvalToken, `Supprimer le message ${messageId}`); const messages = await fetchMessage(channelId, execution.context); const message = await messages.fetch(messageId); await message.delete(); return { deleted: true, id: messageId }; }),
   pin.server(async ({ channelId, messageId, pinned }, execution: Exec) => { const messages = await fetchMessage(channelId, execution.context); const message = await messages.fetch(messageId); if (pinned) await message.pin(); else await message.unpin(); return { id: messageId, pinned }; }),
-  bulkDelete.server(async ({ channelId, messageIds }, execution: Exec) => { await approve(`Supprimer ${messageIds.length} messages dans ${channelId}`); const guild = requireGuild(execution.context); const channel = requireChannel(guild, channelId); if (!("bulkDelete" in channel)) throw new Error("Salon incompatible avec la suppression groupée."); const deleted = await channel.bulkDelete(messageIds, true); return { deleted: deleted.size }; }),
+  bulkDelete.server(async ({ channelId, messageIds, approvalToken }, execution: Exec) => { await approve("bulk_delete_messages", messageIds, approvalToken, `Supprimer ${messageIds.length} messages dans ${channelId}`); const guild = requireGuild(execution.context); const channel = requireChannel(guild, channelId); if (!("bulkDelete" in channel)) throw new Error("Salon incompatible avec la suppression groupée."); const deleted = await channel.bulkDelete(messageIds, true); return { deleted: deleted.size }; }),
 ];
 

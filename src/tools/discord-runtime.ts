@@ -49,10 +49,15 @@ export function serializeRole(role: Role) {
   return { id: role.id, name: role.name, color: role.hexColor, position: role.position, managed: role.managed };
 }
 
-export async function approve(description: string, timeoutMs?: number): Promise<void> {
+export async function approve(action: string, targetIds: readonly string[], token: string | undefined, description: string): Promise<void> {
   if (!discordRuntime.approvals) throw new Error("Le gestionnaire d'approbation n'est pas configuré.");
-  const approved = await discordRuntime.approvals.request(description, timeoutMs);
-  if (!approved) throw new Error("Action refusée ou approbation expirée.");
+  if (token) {
+    discordRuntime.approvals.consume(token, action, targetIds);
+    return;
+  }
+  const result = await discordRuntime.approvals.request(description, action, targetIds);
+  if (!result.approved || !result.token) throw new Error("Action refusée ou approbation expirée.");
+  discordRuntime.approvals.consume(result.token, action, targetIds);
 }
 
 export function ensureInContext(context: ConversationContext | undefined, guildId: string): void {

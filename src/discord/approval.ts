@@ -19,18 +19,37 @@ interface ApprovalScope {
 
 interface PendingApproval {
   authorId: string;
+  channelId: string;
   timer: ReturnType<typeof setTimeout>;
-  resolve: (approved: boolean) => void;
+  action: string;
+  targetIds: readonly string[];
+  guildId?: string;
+  resolve: (result: ApprovalResult) => void;
   message?: Message;
+}
+
+export interface ApprovalResult {
+  approved: boolean;
+  token?: string;
+}
+
+interface ApprovedToken {
+  authorId: string;
+  channelId: string;
+  guildId?: string;
+  action: string;
+  remainingTargets: Set<string>;
+  timer: ReturnType<typeof setTimeout>;
 }
 
 /** Gère les validations courtes pendant une exécution Code Mode. */
 export class ApprovalManager {
   private readonly scopes = new AsyncLocalStorage<ApprovalScope>();
   private readonly pending = new Map<string, PendingApproval>();
+  private readonly approved = new Map<string, ApprovedToken>();
   private client?: Client;
 
-  public constructor(private readonly defaultTimeoutMs: number) {}
+  public constructor(private readonly defaultTimeoutMs: number, private readonly tokenTtlMs: number) {}
 
   public attachClient(client: Client): void {
     this.client = client;
@@ -47,7 +66,7 @@ export class ApprovalManager {
     );
   }
 
-  public async request(description: string, timeoutMs = this.defaultTimeoutMs): Promise<boolean> {
+  public async request(description: string, action: string, targetIds: readonly string[], timeoutMs = this.defaultTimeoutMs): Promise<ApprovalResult> {
     const scope = this.scopes.getStore();
     if (!scope) throw new Error("approval() doit être appelé pendant une réponse Discord.");
     if (!this.client) throw new Error("Le client Discord n'est pas prêt pour les approbations.");
@@ -71,13 +90,17 @@ export class ApprovalManager {
     );
 
     let pending!: PendingApproval;
-    const result = new Promise<boolean>((resolve) => {
+    const result = new Promise<ApprovalResult>((resolve) => {
       pending = {
         authorId: scope.authorId,
+        channelId: scope.channelId,
+        action,
+        targetIds,
+        guildId: scope.guildId,
         resolve,
         timer: setTimeout(() => {
           this.pending.delete(id);
-          resolve(false);
+          resolve({ approved: false });
         }, boundedTimeout),
       };
       this.pending.set(id, pending);
@@ -92,7 +115,7 @@ export class ApprovalManager {
     } catch (error) {
       clearTimeout(pending.timer);
       this.pending.delete(id);
-      pending.resolve(false);
+      pending.resolve({ approved: false });
       throw error;
     }
 
@@ -119,14 +142,48 @@ export class ApprovalManager {
       content: `${approved ? "✅ Approuvé" : "❌ Refusé"} — ${interaction.message.content}`,
       components: [],
     });
-    pending.resolve(approved);
+    if (!approved) {
+      pending.resolve({ approved: false });
+      return;
+    }
+    const token = crypto.randomUUID();
+    const tokenTimer = setTimeout(() => this.approved.delete(token), this.tokenTtlMs);
+    this.approved.set(token, {
+      authorId: pending.authorId,
+      channelId: pending.channelId,
+      guildId: pending.guildId,
+      action: pending.action,
+      remainingTargets: new Set(pending.targetIds),
+      timer: tokenTimer,
+    });
+    pending.resolve({ approved: true, token });
+  }
+
+  public consume(token: string, action: string, targetIds: readonly string[]): void {
+    const scope = this.scopes.getStore();
+    const approval = this.approved.get(token);
+    if (!scope || !approval || approval.authorId !== scope.authorId || approval.channelId !== scope.channelId) {
+      throw new Error("Jeton d'approbation invalide ou expiré.");
+    }
+    if (approval.guildId !== scope.guildId || approval.action !== action || targetIds.some((target) => !approval.remainingTargets.has(target))) {
+      throw new Error("Le jeton d'approbation ne couvre pas cette action ou ces cibles.");
+    }
+    for (const target of targetIds) approval.remainingTargets.delete(target);
+    if (approval.remainingTargets.size === 0) {
+      clearTimeout(approval.timer);
+      this.approved.delete(token);
+    }
   }
 
   public close(): void {
     for (const [id, pending] of this.pending) {
       clearTimeout(pending.timer);
-      pending.resolve(false);
+      pending.resolve({ approved: false });
       this.pending.delete(id);
+    }
+    for (const [token, approval] of this.approved) {
+      clearTimeout(approval.timer);
+      this.approved.delete(token);
     }
   }
 }
