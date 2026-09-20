@@ -48,6 +48,19 @@ POSTHOG_HOST=https://us.i.posthog.com
 
 Pour PostHog Cloud Europe, utilise `https://eu.i.posthog.com`. Le client est flushé lors de l’arrêt du bot. Consulte [la documentation d’architecture](docs/ARCHITECTURE.md) pour les événements suivis et les choix de confidentialité.
 
+## Déploiement Docker
+
+L’image est construite et publiée automatiquement dans GitHub Container Registry par [le workflow Docker](.github/workflows/docker.yml). Elle est disponible sous `ghcr.io/frflo/dumbdiscordbot` avec les tags de branche, de version et `latest` sur la branche par défaut.
+
+Construire et lancer localement :
+
+```bash
+docker build -t dumbdiscordbot .
+docker run --rm --env-file .env --restart unless-stopped dumbdiscordbot
+```
+
+Pour utiliser Ollama installé sur la machine hôte depuis Docker Desktop, définis `OPENAI_BASE_URL=http://host.docker.internal:11434/v1`. Le conteneur reçoit les secrets uniquement via son environnement ; aucune clé n’est intégrée à l’image.
+
 ## Documentation
 
 - [Architecture et principes](docs/ARCHITECTURE.md)

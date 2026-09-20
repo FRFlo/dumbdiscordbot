@@ -1,0 +1,13 @@
+.git
+.github
+.pi
+node_modules
+.env
+.env.*
+coverage
+dist
+docs
+README.md
+Dockerfile
+docker-compose.yml
+*.log
