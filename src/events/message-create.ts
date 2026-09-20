@@ -55,6 +55,10 @@ const event: BotEvent<"messageCreate"> = {
 
 			if (response.trim() === SILENT_RESPONSE) {
 				message.client.followUps.clear(key);
+				await message.reply({
+					content: `${SILENT_RESPONSE} — L'agent a choisi de ne pas répondre à ce message.`,
+					allowedMentions: { repliedUser: false },
+				});
 				return;
 			}
 			message.client.followUps.record(key, content, response);
