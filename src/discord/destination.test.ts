@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { discordContextStorage } from "../tools/discord-runtime";
 import { parseDiscordDestination } from "./destination";
 
 describe("destinations Discord", () => {
@@ -31,6 +32,12 @@ describe("destinations Discord", () => {
 				content: "",
 			}),
 		).toEqual({ type: "current" });
+		expect(
+			discordContextStorage.run(
+				{ channelId: "123", authorId: "456", authorName: "Test", content: "" },
+				() => parseDiscordDestination("discord:dm:456"),
+			),
+		).toEqual({ type: "dm", userId: "456" });
 	});
 
 	test("rejette les destinations ambiguës ou hors format", () => {

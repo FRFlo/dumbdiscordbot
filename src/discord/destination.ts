@@ -1,6 +1,11 @@
 import { ChannelType, type Client, type Guild, type SendableChannels } from "discord.js";
 import type { ConversationContext } from "../domain/types";
-import { requireChannel, requireClient, requireGuild } from "../tools/discord-runtime";
+import {
+	getToolContext,
+	requireChannel,
+	requireClient,
+	requireGuild,
+} from "../tools/discord-runtime";
 
 export type DiscordDestination =
 	| { type: "current" }
@@ -19,6 +24,7 @@ export function parseDiscordDestination(
 	value: string,
 	context?: ConversationContext,
 ): DiscordDestination {
+	context = getToolContext(context);
 	if (value === "current") {
 		if (!context?.channelId)
 			throw new Error("La destination current nécessite un contexte Discord.");
@@ -60,6 +66,7 @@ export async function resolveDiscordDestination(
 	destination: DiscordDestination,
 	context?: ConversationContext,
 ): Promise<SendableChannels> {
+	context = getToolContext(context);
 	const client: Client = requireClient();
 	if (destination.type === "current") {
 		if (!context?.channelId)
