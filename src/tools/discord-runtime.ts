@@ -55,7 +55,7 @@ export async function approve(action: string, targetIds: readonly string[], toke
     discordRuntime.approvals.consume(token, action, targetIds);
     return;
   }
-  const result = await discordRuntime.approvals.request(description, action, targetIds);
+  const result = await discordRuntime.approvals.request(description, [{ action, targetIds }]);
   if (!result.approved || !result.token) throw new Error("Action refusée ou approbation expirée.");
   discordRuntime.approvals.consume(result.token, action, targetIds);
 }

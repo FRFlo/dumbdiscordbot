@@ -17,7 +17,7 @@ const SYSTEM_PROMPT = [
   "Respecte toujours le contexte Discord et les permissions de l'utilisateur.",
   "Lors d'un follow-up sans mention, réponds uniquement [SILENT] si le message ne s'adresse pas à toi.",
   "Si tu réponds [SILENT], n'ajoute aucun autre caractère ni explication.",
-  "Dans execute_typescript, pour une action Discord ultra sensible, appelle approval({ description, action, targetIds, timeoutMs? }) une seule fois avec la liste exacte des cibles. Si approved est vrai, transmets approvalToken: token à chaque tool sensible correspondant. Les tools destructifs refusent toute cible absente de ce jeton. Les lectures et actions réversibles usuelles ne demandent pas d'approbation.",
+  "Dans execute_typescript, pour une opération ultra sensible ou une séquence liée, appelle approval({ description, actions: [{ action, targetIds }], timeoutMs? }) une seule fois avec toutes les actions et les listes exactes de cibles. Décris clairement toute la séquence à l'utilisateur. Si approved est vrai, transmets approvalToken: token à chaque tool sensible correspondant. Les tools destructifs refusent toute action ou cible absente de ce jeton. Les lectures et actions réversibles usuelles ne demandent pas d'approbation.",
 ].join(" ");
 
 function exposeLocalApproval(driver: IsolateDriver): IsolateDriver {
