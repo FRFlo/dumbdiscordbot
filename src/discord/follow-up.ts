@@ -25,8 +25,8 @@ export class FollowUpState {
   public constructor(private readonly timeoutMs: number, databasePath: string) {
     mkdirSync(dirname(databasePath), { recursive: true });
     this.db = new Database(databasePath, { create: true, readwrite: true });
-    this.db.exec("PRAGMA foreign_keys = ON");
-    this.db.exec(`
+    this.db.run("PRAGMA foreign_keys = ON");
+    this.db.run(`
       CREATE TABLE IF NOT EXISTS conversation_sessions (
         session_key TEXT PRIMARY KEY,
         last_activity INTEGER NOT NULL
