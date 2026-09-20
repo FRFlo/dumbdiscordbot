@@ -1,5 +1,6 @@
 import type { Message } from "discord.js";
 import type { BotEvent } from "../types";
+import { extractDirectResponse } from "../tools/discord-runtime";
 
 const SILENT_RESPONSE = "[SILENT]";
 const TYPING_REFRESH_MS = 8_000;
@@ -59,6 +60,11 @@ const event: BotEvent<"messageCreate"> = {
 					content: `${SILENT_RESPONSE} — L'agent a choisi de ne pas répondre à ce message.`,
 					allowedMentions: { repliedUser: false },
 				});
+				return;
+			}
+			const directResponse = extractDirectResponse(response);
+			if (directResponse !== undefined) {
+				message.client.followUps.record(key, content, directResponse);
 				return;
 			}
 			message.client.followUps.record(key, content, response);

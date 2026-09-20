@@ -9,7 +9,12 @@ import type { Logger } from "../observability/logger";
 import type { PostHogObservability } from "../observability/posthog";
 import { ToolRegistry } from "../tools/registry";
 import type { QuestionManager } from "../discord/question";
-import { discordContextStorage } from "../tools/discord-runtime";
+import {
+	discordContextStorage,
+	formatDirectResponse,
+	getDirectResponse,
+	runDirectResponseScope,
+} from "../tools/discord-runtime";
 import { SYSTEM_PROMPT, formatDiscordRequest, formatHistoryMessage } from "./system-prompt";
 
 function createIsolateDriver(config: AppConfig, logger: Logger) {
@@ -67,83 +72,87 @@ export class Agent {
 
 	public async respond(context: ConversationContext, maxAgentIterations: number): Promise<string> {
 		return discordContextStorage.run(context, () =>
-			this.questions.run(context, async () => {
-				const runId = crypto.randomUUID();
-				const distinctId = `discord:${context.authorId}`;
-				const sessionId = `discord:${context.guildId ?? "dm"}:${context.channelId}`;
-				const startedAt = Date.now();
-				this.observability.captureAiStarted(runId, {
-					distinctId,
-					model: this.model,
-					provider: "openai-compatible",
-					guildId: context.guildId,
-					channelId: context.channelId,
-					sessionId,
-					intent: context.content,
-					input: context.content,
-					toolCount: this.codeModeTools.length,
-				});
-				try {
-					const stream = chat({
-						adapter: this.adapter,
-						messages: [
-							...(context.history ?? []).map(formatHistoryMessage),
-							{ role: "user" as const, content: formatDiscordRequest(context) },
-						],
-						systemPrompts: [
-							SYSTEM_PROMPT,
-							...(context.isFollowUp
-								? ["Ce message est un follow-up dans une discussion active."]
-								: []),
-							this.codeModeSystemPrompt,
-						],
-						tools: [...this.codeModeTools],
-						context,
-						agentLoopStrategy: maxIterations(maxAgentIterations),
-					});
-					const observed = await this.observability.observeAiStream(stream, runId, distinctId, {
+			runDirectResponseScope(() =>
+				this.questions.run(context, async () => {
+					const runId = crypto.randomUUID();
+					const distinctId = `discord:${context.authorId}`;
+					const sessionId = `discord:${context.guildId ?? "dm"}:${context.channelId}`;
+					const startedAt = Date.now();
+					this.observability.captureAiStarted(runId, {
+						distinctId,
+						model: this.model,
+						provider: "openai-compatible",
+						guildId: context.guildId,
+						channelId: context.channelId,
 						sessionId,
-						model: this.model,
 						intent: context.content,
-					});
-					const response = observed.response.trim()
-						? observed.response
-						: [
-								"Je n'ai pas pu produire une réponse textuelle.",
-								observed.finishReason
-									? `La génération s'est terminée avec le motif « ${observed.finishReason} ».`
-									: "La génération s'est terminée sans motif communiqué.",
-								observed.toolCalls.length
-									? `Tools exécutés : ${observed.toolCalls.join(", ")}.`
-									: "Aucun tool n'a été exécuté.",
-								"Consulte les détails techniques ou réessaie avec une demande plus précise.",
-							].join(" ");
-					this.observability.captureAiCompleted(runId, distinctId, {
-						duration_ms: Date.now() - startedAt,
-						response_chars: response.length,
-						response,
 						input: context.content,
-						model: this.model,
-						session_id: sessionId,
-						channel_id: context.channelId,
-						finish_reason: observed.finishReason,
-						tool_calls: observed.toolCalls,
+						toolCount: this.codeModeTools.length,
 					});
-					return response;
-				} catch (error) {
-					this.logger.error("Échec de l'exécution TanStack AI", { error: String(error) });
-					this.observability.captureAiFailed(runId, distinctId, error, {
-						model: this.model,
-						session_id: sessionId,
-						duration_ms: Date.now() - startedAt,
-					});
-					return [
-						"Je n'ai pas pu traiter la demande.",
-						`Détail de l'erreur : ${describeError(error)}.`,
-						"Aucune réponse fiable n'a été envoyée ; tu peux réessayer ou reformuler la demande.",
-					].join(" ");
-				}
-			}),
+					try {
+						const stream = chat({
+							adapter: this.adapter,
+							messages: [
+								...(context.history ?? []).map(formatHistoryMessage),
+								{ role: "user" as const, content: formatDiscordRequest(context) },
+							],
+							systemPrompts: [
+								SYSTEM_PROMPT,
+								...(context.isFollowUp
+									? ["Ce message est un follow-up dans une discussion active."]
+									: []),
+								this.codeModeSystemPrompt,
+							],
+							tools: [...this.codeModeTools],
+							context,
+							agentLoopStrategy: maxIterations(maxAgentIterations),
+						});
+						const observed = await this.observability.observeAiStream(stream, runId, distinctId, {
+							sessionId,
+							model: this.model,
+							intent: context.content,
+						});
+						const directResponse = getDirectResponse();
+						const generatedResponse = observed.response.trim()
+							? observed.response
+							: [
+									"Je n'ai pas pu produire une réponse textuelle.",
+									observed.finishReason
+										? `La génération s'est terminée avec le motif « ${observed.finishReason} ».`
+										: "La génération s'est terminée sans motif communiqué.",
+									observed.toolCalls.length
+										? `Tools exécutés : ${observed.toolCalls.join(", ")}.`
+										: "Aucun tool n'a été exécuté.",
+									"Consulte les détails techniques ou réessaie avec une demande plus précise.",
+								].join(" ");
+						const response = directResponse ?? generatedResponse;
+						this.observability.captureAiCompleted(runId, distinctId, {
+							duration_ms: Date.now() - startedAt,
+							response_chars: response.length,
+							response,
+							input: context.content,
+							model: this.model,
+							session_id: sessionId,
+							channel_id: context.channelId,
+							finish_reason: observed.finishReason,
+							tool_calls: observed.toolCalls,
+						});
+						return directResponse ? formatDirectResponse(directResponse) : response;
+					} catch (error) {
+						this.logger.error("Échec de l'exécution TanStack AI", { error: String(error) });
+						this.observability.captureAiFailed(runId, distinctId, error, {
+							model: this.model,
+							session_id: sessionId,
+							duration_ms: Date.now() - startedAt,
+						});
+						return [
+							"Je n'ai pas pu traiter la demande.",
+							`Détail de l'erreur : ${describeError(error)}.`,
+							"Aucune réponse fiable n'a été envoyée ; tu peux réessayer ou reformuler la demande.",
+						].join(" ");
+					}
+				}),
+			),
 		);
 	}
 }

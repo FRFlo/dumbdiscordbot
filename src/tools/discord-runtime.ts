@@ -15,8 +15,42 @@ export interface DiscordToolRuntime {
 	questions?: QuestionManager;
 }
 
+export const DIRECT_RESPONSE_PREFIX = "[DIRECT_RESPONSE]\n";
+
+export function formatDirectResponse(content: string): string {
+	return `${DIRECT_RESPONSE_PREFIX}${content}`;
+}
+
+export function extractDirectResponse(response: string): string | undefined {
+	return response.startsWith(DIRECT_RESPONSE_PREFIX)
+		? response.slice(DIRECT_RESPONSE_PREFIX.length)
+		: undefined;
+}
+
 export const discordRuntime: DiscordToolRuntime = {};
 export const discordContextStorage = new AsyncLocalStorage<ConversationContext>();
+const directResponseStorage = new AsyncLocalStorage<{ content?: string }>();
+
+export function runDirectResponseScope<T>(callback: () => Promise<T>): Promise<T> {
+	return directResponseStorage.run({}, callback);
+}
+
+export function getDirectResponse(): string | undefined {
+	return directResponseStorage.getStore()?.content;
+}
+
+export async function sendDirectResponse(content: string): Promise<void> {
+	const context = getToolContext();
+	if (!context)
+		throw new Error("La réponse directe doit être appelée pendant une réponse Discord.");
+	const channel = await requireClient().channels.fetch(context.channelId);
+	if (!channel?.isSendable())
+		throw new Error("Le salon courant ne permet pas d'envoyer une réponse.");
+	await channel.send({ content, allowedMentions: { parse: [] } });
+	const state = directResponseStorage.getStore();
+	if (!state) throw new Error("Le contexte de réponse directe n'est pas disponible.");
+	state.content = content;
+}
 
 export function getToolContext(context?: ConversationContext): ConversationContext | undefined {
 	return context ?? discordContextStorage.getStore();
