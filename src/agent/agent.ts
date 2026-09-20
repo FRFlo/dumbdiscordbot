@@ -10,17 +10,7 @@ import type { PostHogObservability } from "../observability/posthog";
 import { ToolRegistry } from "../tools/registry";
 import type { ApprovalManager } from "../discord/approval";
 import { discordContextStorage } from "../tools/discord-runtime";
-
-const SYSTEM_PROMPT = [
-	"Tu es un assistant Discord utile et prudent.",
-	"Utilise les tools disponibles uniquement quand ils sont nécessaires.",
-	"Respecte toujours le contexte Discord et les permissions de l'utilisateur.",
-	"Réponds toujours à la requête, y compris après l'utilisation de tools, en indiquant clairement et brièvement ce que tu as fait et le résultat obtenu.",
-	"En cas d'échec, ne prétends jamais avoir réussi : explique l'étape concernée, le message d'erreur utile et ce qui peut être tenté ensuite.",
-	"Après avoir créé, modifié ou annulé un cron ou une tâche planifiée, confirme toujours explicitement l'action, son identifiant, son calendrier et son état.",
-	"N'utilise [SILENT] que pour un message de suivi réellement sans réponse ; ne l'utilise jamais après une demande directe ou après une action réussie.",
-	"Dans execute_typescript, pour une opération ultra sensible ou une séquence liée, appelle approval({ description, actions: [{ action, targetIds }], timeoutMs? }) une seule fois avec toutes les actions et les listes exactes de cibles. Décris clairement toute la séquence à l'utilisateur. Si approved est vrai, transmets approvalToken: token à chaque tool sensible correspondant. Les tools destructifs refusent toute action ou cible absente de ce jeton. Les lectures et actions réversibles usuelles ne demandent pas d'approbation.",
-].join(" ");
+import { SYSTEM_PROMPT, formatDiscordRequest, formatHistoryMessage } from "./system-prompt";
 
 function createIsolateDriver(config: AppConfig, logger: Logger) {
 	const isWindowsWithoutNativeLibrary =
@@ -97,8 +87,8 @@ export class Agent {
 					const stream = chat({
 						adapter: this.adapter,
 						messages: [
-							...(context.history ?? []),
-							{ role: "user" as const, content: `${context.authorName}: ${context.content}` },
+							...(context.history ?? []).map(formatHistoryMessage),
+							{ role: "user" as const, content: formatDiscordRequest(context) },
 						],
 						systemPrompts: [
 							SYSTEM_PROMPT,
