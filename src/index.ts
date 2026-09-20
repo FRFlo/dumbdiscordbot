@@ -9,6 +9,7 @@ import { createApprovalTool } from "./tools/approval";
 import { createQuestionTool } from "./tools/question";
 import { discordRuntime } from "./tools/discord-runtime";
 import { startScheduler, stopScheduler } from "./ecosystem/scheduler";
+import { startEventAddons, stopEventAddons } from "./ecosystem/event-addons";
 
 const config = loadConfig();
 const observability = new PostHogObservability(config, logger);
@@ -34,6 +35,7 @@ const shutdown = async (exitCode: number): Promise<void> => {
 	await observability.shutdown();
 	questions.close();
 	stopScheduler();
+	stopEventAddons();
 	discord.client.followUps.close();
 	discord.client.destroy();
 	process.exit(exitCode);
@@ -54,3 +56,4 @@ process.on("SIGTERM", () => void shutdown(0));
 
 await discord.start();
 startScheduler(discord.client, agent, config.maxAgentIterations);
+startEventAddons(discord.client, agent, config.maxAgentIterations);

@@ -106,6 +106,21 @@ déclenchement.
 Les scripts cron restent volontairement limités aux bindings explicitement
 exposés ; les tâches arbitraires ne sont pas exécutées depuis SQLite.
 
+## Addons d'événements Discord
+
+`create_discord_event_addon` branche durablement une action sur un événement
+`discord.js`, par exemple `messageCreate`, `guildMemberAdd` ou
+`interactionCreate`. L'addon cible un salon du serveur courant et peut soit
+invoquer l'agent avec un prompt, soit exécuter un script QuickJS isolé. Le
+payload JSON de l'événement est ajouté au prompt de l'agent et est accessible
+dans un script via `get_event_payload`.
+
+Les scripts disposent aussi de `send_message`, `invoke_agent` et
+`get_current_time`. `maxAgentCalls` borne les appels agent d'un script. Le
+champ `once` retire l'addon après sa première occurrence. Les addons sont
+persistés dans SQLite et peuvent être listés, mis en pause ou supprimés avec
+`list_discord_event_addons` et `update_discord_event_addon_status`.
+
 ## Permissions Discord
 
 Le bot doit disposer des intents privilégiés et permissions correspondant aux
