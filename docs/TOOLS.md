@@ -15,7 +15,21 @@ Les fichiers `discord-*.ts` constituent les catégories principales :
 - `events` : événements planifiés ;
 - `media` : pièces jointes et fichiers ;
 - `admin` : présence, statut et serveurs connectés ;
-- `automation` : rappels temporisés en mémoire.
+- `automation` : rappels temporisés en mémoire ;
+- `members` : profils, recherche et gestion des membres ;
+- `channel-settings` : paramètres et overwrites des salons ;
+- `threads` : membres, adhésion et gestion des threads ;
+- `forums` : publications et tags des forums ;
+- `invites` : création, consultation et suppression des invitations ;
+- `webhooks` : cycle de vie des webhooks ;
+- `roles` : rôles et membres associés ;
+- `moderation-bulk` : bannissements, timeouts groupés et pruning ;
+- `automod` : règles AutoMod ;
+- `expressions` : emojis et stickers ;
+- `voice` : salons vocaux et instances Stage ;
+- `publishing` : publication, embeds et sondages ;
+- `operations` : planification persistante, opérations longues, recherche,
+  permissions, audit, simulation et état des limites.
 
 Le registre publie également une catégorie dérivée et des tags (`sector-scoped`,
 `destructive`, `requires-approval`) dans son catalogue interne.
@@ -51,6 +65,10 @@ courant, y compris depuis le code exécuté dans Code Mode.
 Les catégories disposent de tools dédiés pour les lister, les récupérer, les
 créer, les modifier, les déplacer et les supprimer. La suppression d'une
 catégorie reste protégée par une approbation ciblée.
+
+Les tools avancés n'exposent jamais les tokens de webhook. La création ou
+l'envoi d'un webhook doit utiliser un secret fourni explicitement et ne doit
+pas être recopié dans une réponse, un prompt ou un journal.
 
 ## Permissions Discord
 

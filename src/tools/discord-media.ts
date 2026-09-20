@@ -107,7 +107,7 @@ export default [
 		const channel = requireChannel(requireGuild(execution.context), channelId);
 		if (!("createWebhook" in channel)) throw new Error("Salon incompatible avec les webhooks.");
 		const webhook = await channel.createWebhook({ name });
-		return { id: webhook.id, name: webhook.name, token: webhook.token };
+		return { id: webhook.id, name: webhook.name, tokenAvailable: Boolean(webhook.token) };
 	}),
 	sendWebhook.server(async ({ webhookId, webhookToken, content }) => {
 		const webhook = new WebhookClient({ id: webhookId, token: webhookToken });

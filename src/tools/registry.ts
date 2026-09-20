@@ -48,6 +48,7 @@ export class ToolRegistry {
 			? ["discord", "destructive", "requires-approval"]
 			: ["discord", "sector-scoped"];
 		this.info.set(tool.name, { name: tool.name, category, tags });
+		tool.lazy = category !== "core";
 		tool.description = `[${category}] ${tool.description}${destructive ? " Action destructive : utilise approval avant l'exécution si nécessaire." : ""}`;
 	}
 

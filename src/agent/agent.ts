@@ -83,6 +83,7 @@ export class Agent {
 		this.codeMode = createCodeMode({
 			driver: exposeLocalApproval(createIsolateDriver(config, logger)),
 			tools: [...this.tools.all()],
+			lazyToolsConfig: { includeDescription: "first-sentence" },
 			timeout: config.codeModeTimeout,
 			memoryLimit: config.codeModeMemoryLimit,
 		});
