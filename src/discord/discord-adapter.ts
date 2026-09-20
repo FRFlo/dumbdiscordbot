@@ -9,23 +9,23 @@ import type { PostHogObservability } from "../observability/posthog";
 import type { ApprovalManager } from "./approval";
 
 export class DiscordAdapter {
-  public readonly client: Client;
-  private readonly config: AppConfig;
+	public readonly client: Client;
+	private readonly config: AppConfig;
 
-  public constructor(
-    config: AppConfig,
-    agent: Agent,
-    logger: Logger,
-    observability: PostHogObservability,
-    approvals: ApprovalManager,
-  ) {
-    this.client = createDiscordClient(agent, logger, observability, config, approvals);
-    this.config = config;
-  }
+	public constructor(
+		config: AppConfig,
+		agent: Agent,
+		logger: Logger,
+		observability: PostHogObservability,
+		approvals: ApprovalManager,
+	) {
+		this.client = createDiscordClient(agent, logger, observability, config, approvals);
+		this.config = config;
+	}
 
-  public async start(): Promise<void> {
-    await loadEvents(this.client);
-    await this.client.login(this.config.discordToken);
-    await loadCommands(this.client, this.config);
-  }
+	public async start(): Promise<void> {
+		await loadEvents(this.client);
+		await this.client.login(this.config.discordToken);
+		await loadCommands(this.client, this.config);
+	}
 }

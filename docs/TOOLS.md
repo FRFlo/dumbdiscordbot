@@ -54,4 +54,3 @@ Le bot doit disposer des intents privilégiés et permissions correspondant aux
 tools réellement utilisés. Les intents membres, modération, réactions,
 événements planifiés et contenu des messages sont activés dans le client ; ils
 doivent également être activés dans le portail développeur Discord.
-

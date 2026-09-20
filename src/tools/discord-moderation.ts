@@ -1,42 +1,277 @@
-import { AuditLogEvent, PermissionFlagsBits } from "discord.js";
+import { AuditLogEvent } from "discord.js";
 import { toolDefinition } from "@tanstack/ai";
 import { z } from "zod";
 import type { ConversationContext } from "../domain/types";
-import { approve, requireGuild, requireMember, serializeRole } from "./discord-runtime";
+import { approve, requireGuild, requireMember } from "./discord-runtime";
 import { memberSummary, roleSummary } from "./discord-helpers";
 
 type Exec = { context?: ConversationContext };
-const cases = new Map<string, { id: string; userId: string; reason: string; status: "open" | "closed"; createdAt: string }>();
-const roleOutput = z.object({ id: z.string(), name: z.string(), color: z.string(), position: z.number(), managed: z.boolean(), permissions: z.array(z.string()) });
-const editMember = toolDefinition({ name: "edit_member_nickname", description: "Modifie le surnom d'un membre après approbation.", inputSchema: z.object({ userId: z.string(), nickname: z.string().max(32).nullable(), guildId: z.string().optional() }), outputSchema: z.any() });
-const timeout = toolDefinition({ name: "timeout_member", description: "Place un membre en timeout après approbation.", inputSchema: z.object({ userId: z.string(), durationMinutes: z.number().int().min(1).max(28 * 24 * 60), reason: z.string().max(500).optional(), guildId: z.string().optional() }), outputSchema: z.any() });
-const kick = toolDefinition({ name: "kick_member", description: "Expulse un membre après approbation groupée possible.", inputSchema: z.object({ userId: z.string(), reason: z.string().max(500).optional(), guildId: z.string().optional(), approvalToken: z.string().optional() }), outputSchema: z.object({ kicked: z.boolean(), id: z.string() }) });
-const ban = toolDefinition({ name: "ban_member", description: "Bannit un membre après approbation groupée possible.", inputSchema: z.object({ userId: z.string(), deleteMessageDays: z.number().int().min(0).max(7).default(0), reason: z.string().max(500).optional(), guildId: z.string().optional(), approvalToken: z.string().optional() }), outputSchema: z.object({ banned: z.boolean(), id: z.string() }) });
-const unban = toolDefinition({ name: "unban_member", description: "Débannit un utilisateur après approbation groupée possible.", inputSchema: z.object({ userId: z.string(), reason: z.string().max(500).optional(), guildId: z.string().optional(), approvalToken: z.string().optional() }), outputSchema: z.object({ unbanned: z.boolean(), id: z.string() }) });
-const warn = toolDefinition({ name: "warn_member", description: "Enregistre un avertissement dans le contexte de la demande après approbation.", inputSchema: z.object({ userId: z.string(), reason: z.string().min(1).max(500), guildId: z.string().optional() }), outputSchema: z.object({ warned: z.boolean(), id: z.string(), reason: z.string() }) });
-const audit = toolDefinition({ name: "get_audit_log", description: "Liste les dernières entrées du journal d'audit.", inputSchema: z.object({ guildId: z.string().optional(), limit: z.number().int().min(1).max(100).default(25), actionType: z.number().int().optional() }), outputSchema: z.any() });
-const history = toolDefinition({ name: "get_moderation_history", description: "Retourne l'historique d'audit associé à un membre.", inputSchema: z.object({ userId: z.string(), guildId: z.string().optional(), limit: z.number().int().min(1).max(100).default(25) }), outputSchema: z.any() });
-const createCase = toolDefinition({ name: "create_moderation_case", description: "Crée un dossier de modération temporaire pour la session du bot.", inputSchema: z.object({ userId: z.string(), reason: z.string().min(1).max(500), guildId: z.string().optional() }), outputSchema: z.any() });
-const closeCase = toolDefinition({ name: "close_moderation_case", description: "Clôture un dossier de modération temporaire.", inputSchema: z.object({ caseId: z.string() }), outputSchema: z.any() });
-const addRole = toolDefinition({ name: "add_role_to_member", description: "Ajoute un rôle à un membre après approbation.", inputSchema: z.object({ userId: z.string(), roleId: z.string(), guildId: z.string().optional() }), outputSchema: z.any() });
-const removeRole = toolDefinition({ name: "remove_role_from_member", description: "Retire un rôle à un membre après approbation.", inputSchema: z.object({ userId: z.string(), roleId: z.string(), guildId: z.string().optional() }), outputSchema: z.any() });
-const createRole = toolDefinition({ name: "create_role", description: "Crée un rôle après approbation.", inputSchema: z.object({ name: z.string().min(1).max(100), color: z.string().regex(/^#?[0-9a-f]{6}$/i).optional(), reason: z.string().max(500).optional(), guildId: z.string().optional() }), outputSchema: roleOutput });
-const deleteRole = toolDefinition({ name: "delete_role", description: "Supprime un rôle après approbation groupée possible.", inputSchema: z.object({ roleId: z.string(), guildId: z.string().optional(), approvalToken: z.string().optional() }), outputSchema: z.object({ deleted: z.boolean(), id: z.string() }) });
+const cases = new Map<
+	string,
+	{ id: string; userId: string; reason: string; status: "open" | "closed"; createdAt: string }
+>();
+const roleOutput = z.object({
+	id: z.string(),
+	name: z.string(),
+	color: z.string(),
+	position: z.number(),
+	managed: z.boolean(),
+	permissions: z.array(z.string()),
+});
+const editMember = toolDefinition({
+	name: "edit_member_nickname",
+	description: "Modifie le surnom d'un membre après approbation.",
+	inputSchema: z.object({
+		userId: z.string(),
+		nickname: z.string().max(32).nullable(),
+		guildId: z.string().optional(),
+	}),
+	outputSchema: z.any(),
+});
+const timeout = toolDefinition({
+	name: "timeout_member",
+	description: "Place un membre en timeout après approbation.",
+	inputSchema: z.object({
+		userId: z.string(),
+		durationMinutes: z
+			.number()
+			.int()
+			.min(1)
+			.max(28 * 24 * 60),
+		reason: z.string().max(500).optional(),
+		guildId: z.string().optional(),
+	}),
+	outputSchema: z.any(),
+});
+const kick = toolDefinition({
+	name: "kick_member",
+	description: "Expulse un membre après approbation groupée possible.",
+	inputSchema: z.object({
+		userId: z.string(),
+		reason: z.string().max(500).optional(),
+		guildId: z.string().optional(),
+		approvalToken: z.string().optional(),
+	}),
+	outputSchema: z.object({ kicked: z.boolean(), id: z.string() }),
+});
+const ban = toolDefinition({
+	name: "ban_member",
+	description: "Bannit un membre après approbation groupée possible.",
+	inputSchema: z.object({
+		userId: z.string(),
+		deleteMessageDays: z.number().int().min(0).max(7).default(0),
+		reason: z.string().max(500).optional(),
+		guildId: z.string().optional(),
+		approvalToken: z.string().optional(),
+	}),
+	outputSchema: z.object({ banned: z.boolean(), id: z.string() }),
+});
+const unban = toolDefinition({
+	name: "unban_member",
+	description: "Débannit un utilisateur après approbation groupée possible.",
+	inputSchema: z.object({
+		userId: z.string(),
+		reason: z.string().max(500).optional(),
+		guildId: z.string().optional(),
+		approvalToken: z.string().optional(),
+	}),
+	outputSchema: z.object({ unbanned: z.boolean(), id: z.string() }),
+});
+const warn = toolDefinition({
+	name: "warn_member",
+	description: "Enregistre un avertissement dans le contexte de la demande après approbation.",
+	inputSchema: z.object({
+		userId: z.string(),
+		reason: z.string().min(1).max(500),
+		guildId: z.string().optional(),
+	}),
+	outputSchema: z.object({ warned: z.boolean(), id: z.string(), reason: z.string() }),
+});
+const audit = toolDefinition({
+	name: "get_audit_log",
+	description: "Liste les dernières entrées du journal d'audit.",
+	inputSchema: z.object({
+		guildId: z.string().optional(),
+		limit: z.number().int().min(1).max(100).default(25),
+		actionType: z.number().int().optional(),
+	}),
+	outputSchema: z.any(),
+});
+const history = toolDefinition({
+	name: "get_moderation_history",
+	description: "Retourne l'historique d'audit associé à un membre.",
+	inputSchema: z.object({
+		userId: z.string(),
+		guildId: z.string().optional(),
+		limit: z.number().int().min(1).max(100).default(25),
+	}),
+	outputSchema: z.any(),
+});
+const createCase = toolDefinition({
+	name: "create_moderation_case",
+	description: "Crée un dossier de modération temporaire pour la session du bot.",
+	inputSchema: z.object({
+		userId: z.string(),
+		reason: z.string().min(1).max(500),
+		guildId: z.string().optional(),
+	}),
+	outputSchema: z.any(),
+});
+const closeCase = toolDefinition({
+	name: "close_moderation_case",
+	description: "Clôture un dossier de modération temporaire.",
+	inputSchema: z.object({ caseId: z.string() }),
+	outputSchema: z.any(),
+});
+const addRole = toolDefinition({
+	name: "add_role_to_member",
+	description: "Ajoute un rôle à un membre après approbation.",
+	inputSchema: z.object({ userId: z.string(), roleId: z.string(), guildId: z.string().optional() }),
+	outputSchema: z.any(),
+});
+const removeRole = toolDefinition({
+	name: "remove_role_from_member",
+	description: "Retire un rôle à un membre après approbation.",
+	inputSchema: z.object({ userId: z.string(), roleId: z.string(), guildId: z.string().optional() }),
+	outputSchema: z.any(),
+});
+const createRole = toolDefinition({
+	name: "create_role",
+	description: "Crée un rôle après approbation.",
+	inputSchema: z.object({
+		name: z.string().min(1).max(100),
+		color: z
+			.string()
+			.regex(/^#?[0-9a-f]{6}$/i)
+			.optional(),
+		reason: z.string().max(500).optional(),
+		guildId: z.string().optional(),
+	}),
+	outputSchema: roleOutput,
+});
+const deleteRole = toolDefinition({
+	name: "delete_role",
+	description: "Supprime un rôle après approbation groupée possible.",
+	inputSchema: z.object({
+		roleId: z.string(),
+		guildId: z.string().optional(),
+		approvalToken: z.string().optional(),
+	}),
+	outputSchema: z.object({ deleted: z.boolean(), id: z.string() }),
+});
 
 export default [
-  editMember.server(async ({ userId, nickname, guildId }, execution: Exec) => { const member = await requireMember(requireGuild(execution.context, guildId), userId); return memberSummary(await member.setNickname(nickname)); }),
-  timeout.server(async ({ userId, durationMinutes, reason, guildId }, execution: Exec) => { const member = await requireMember(requireGuild(execution.context, guildId), userId); return memberSummary(await member.timeout(durationMinutes * 60_000, reason)); }),
-  kick.server(async ({ userId, reason, guildId, approvalToken }, execution: Exec) => { await approve("kick_member", [userId], approvalToken, `Expulser ${userId}`); const member = await requireMember(requireGuild(execution.context, guildId), userId); await member.kick(reason); return { kicked: true, id: userId }; }),
-  ban.server(async ({ userId, deleteMessageDays, reason, guildId, approvalToken }, execution: Exec) => { await approve("ban_member", [userId], approvalToken, `Bannir ${userId}`); await requireGuild(execution.context, guildId).bans.create(userId, { deleteMessageSeconds: (deleteMessageDays ?? 0) * 86_400, reason }); return { banned: true, id: userId }; }),
-  unban.server(async ({ userId, reason, guildId, approvalToken }, execution: Exec) => { await approve("unban_member", [userId], approvalToken, `Débannir ${userId}`); await requireGuild(execution.context, guildId).bans.remove(userId, reason); return { unbanned: true, id: userId }; }),
-  warn.server(async ({ userId, reason, guildId }, execution: Exec) => { await requireMember(requireGuild(execution.context, guildId), userId); return { warned: true, id: userId, reason }; }),
-  audit.server(async ({ guildId, limit, actionType }, execution: Exec) => { const logs = await requireGuild(execution.context, guildId).fetchAuditLogs({ limit, type: actionType as AuditLogEvent | undefined }); return { entries: [...logs.entries.values()].map((entry) => ({ id: entry.id, action: entry.action, executorId: entry.executorId, targetId: entry.targetId, reason: entry.reason, createdAt: entry.createdAt.toISOString() })) }; }),
-  history.server(async ({ userId, guildId, limit }, execution: Exec) => { const logs = await requireGuild(execution.context, guildId).fetchAuditLogs({ limit: limit ?? 25 }); return { entries: [...logs.entries.values()].filter((entry) => entry.targetId === userId).map((entry) => ({ id: entry.id, action: entry.action, executorId: entry.executorId, targetId: entry.targetId, reason: entry.reason, createdAt: entry.createdAt.toISOString() })) }; }),
-  createCase.server(async ({ userId, reason }) => { const id = crypto.randomUUID(); const value = { id, userId, reason, status: "open" as const, createdAt: new Date().toISOString() }; cases.set(id, value); return value; }),
-  closeCase.server(async ({ caseId }) => { const value = cases.get(caseId); if (!value) throw new Error("Dossier introuvable."); value.status = "closed"; return value; }),
-  addRole.server(async ({ userId, roleId, guildId }, execution: Exec) => { const guild = requireGuild(execution.context, guildId); const member = await requireMember(guild, userId); const role = await guild.roles.fetch(roleId); if (!role) throw new Error("Rôle introuvable."); await member.roles.add(role); return memberSummary(member); }),
-  removeRole.server(async ({ userId, roleId, guildId }, execution: Exec) => { const guild = requireGuild(execution.context, guildId); const member = await requireMember(guild, userId); await member.roles.remove(roleId); return memberSummary(member); }),
-  createRole.server(async ({ name, color, reason, guildId }, execution: Exec) => { const role = await requireGuild(execution.context, guildId).roles.create({ name, colors: color ? { primaryColor: color as `#${string}` } : undefined, reason }); return roleSummary(role); }),
-  deleteRole.server(async ({ roleId, guildId, approvalToken }, execution: Exec) => { await approve("delete_role", [roleId], approvalToken, `Supprimer le rôle ${roleId}`); const role = await requireGuild(execution.context, guildId).roles.fetch(roleId); if (!role) throw new Error("Rôle introuvable."); await role.delete(); return { deleted: true, id: roleId }; }),
+	editMember.server(async ({ userId, nickname, guildId }, execution: Exec) => {
+		const member = await requireMember(requireGuild(execution.context, guildId), userId);
+		return memberSummary(await member.setNickname(nickname));
+	}),
+	timeout.server(async ({ userId, durationMinutes, reason, guildId }, execution: Exec) => {
+		const member = await requireMember(requireGuild(execution.context, guildId), userId);
+		return memberSummary(await member.timeout(durationMinutes * 60_000, reason));
+	}),
+	kick.server(async ({ userId, reason, guildId, approvalToken }, execution: Exec) => {
+		await approve("kick_member", [userId], approvalToken, `Expulser ${userId}`);
+		const member = await requireMember(requireGuild(execution.context, guildId), userId);
+		await member.kick(reason);
+		return { kicked: true, id: userId };
+	}),
+	ban.server(
+		async ({ userId, deleteMessageDays, reason, guildId, approvalToken }, execution: Exec) => {
+			await approve("ban_member", [userId], approvalToken, `Bannir ${userId}`);
+			await requireGuild(execution.context, guildId).bans.create(userId, {
+				deleteMessageSeconds: (deleteMessageDays ?? 0) * 86_400,
+				reason,
+			});
+			return { banned: true, id: userId };
+		},
+	),
+	unban.server(async ({ userId, reason, guildId, approvalToken }, execution: Exec) => {
+		await approve("unban_member", [userId], approvalToken, `Débannir ${userId}`);
+		await requireGuild(execution.context, guildId).bans.remove(userId, reason);
+		return { unbanned: true, id: userId };
+	}),
+	warn.server(async ({ userId, reason, guildId }, execution: Exec) => {
+		await requireMember(requireGuild(execution.context, guildId), userId);
+		return { warned: true, id: userId, reason };
+	}),
+	audit.server(async ({ guildId, limit, actionType }, execution: Exec) => {
+		const logs = await requireGuild(execution.context, guildId).fetchAuditLogs({
+			limit,
+			type: actionType as AuditLogEvent | undefined,
+		});
+		return {
+			entries: [...logs.entries.values()].map((entry) => ({
+				id: entry.id,
+				action: entry.action,
+				executorId: entry.executorId,
+				targetId: entry.targetId,
+				reason: entry.reason,
+				createdAt: entry.createdAt.toISOString(),
+			})),
+		};
+	}),
+	history.server(async ({ userId, guildId, limit }, execution: Exec) => {
+		const logs = await requireGuild(execution.context, guildId).fetchAuditLogs({
+			limit: limit ?? 25,
+		});
+		return {
+			entries: [...logs.entries.values()]
+				.filter((entry) => entry.targetId === userId)
+				.map((entry) => ({
+					id: entry.id,
+					action: entry.action,
+					executorId: entry.executorId,
+					targetId: entry.targetId,
+					reason: entry.reason,
+					createdAt: entry.createdAt.toISOString(),
+				})),
+		};
+	}),
+	createCase.server(async ({ userId, reason }) => {
+		const id = crypto.randomUUID();
+		const value = {
+			id,
+			userId,
+			reason,
+			status: "open" as const,
+			createdAt: new Date().toISOString(),
+		};
+		cases.set(id, value);
+		return value;
+	}),
+	closeCase.server(async ({ caseId }) => {
+		const value = cases.get(caseId);
+		if (!value) throw new Error("Dossier introuvable.");
+		value.status = "closed";
+		return value;
+	}),
+	addRole.server(async ({ userId, roleId, guildId }, execution: Exec) => {
+		const guild = requireGuild(execution.context, guildId);
+		const member = await requireMember(guild, userId);
+		const role = await guild.roles.fetch(roleId);
+		if (!role) throw new Error("Rôle introuvable.");
+		await member.roles.add(role);
+		return memberSummary(member);
+	}),
+	removeRole.server(async ({ userId, roleId, guildId }, execution: Exec) => {
+		const guild = requireGuild(execution.context, guildId);
+		const member = await requireMember(guild, userId);
+		await member.roles.remove(roleId);
+		return memberSummary(member);
+	}),
+	createRole.server(async ({ name, color, reason, guildId }, execution: Exec) => {
+		const role = await requireGuild(execution.context, guildId).roles.create({
+			name,
+			colors: color ? { primaryColor: color as `#${string}` } : undefined,
+			reason,
+		});
+		return roleSummary(role);
+	}),
+	deleteRole.server(async ({ roleId, guildId, approvalToken }, execution: Exec) => {
+		await approve("delete_role", [roleId], approvalToken, `Supprimer le rôle ${roleId}`);
+		const role = await requireGuild(execution.context, guildId).roles.fetch(roleId);
+		if (!role) throw new Error("Rôle introuvable.");
+		await role.delete();
+		return { deleted: true, id: roleId };
+	}),
 ];
-

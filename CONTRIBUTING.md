@@ -18,7 +18,9 @@ Utilise une branche courte basée sur `develop`, par exemple `feat/tool-reminder
 - garde les changements ciblés ;
 - ajoute ou mets à jour les tests lorsque le comportement change ;
 - documente les impacts sur permissions, secrets et données ;
-- vérifie `bun run check` avant de soumettre la PR.
+- vérifie `bun run check` avant de soumettre la PR ;
+- utilise `bun run format` pour appliquer le formatage Oxfmt et `bun run lint`
+  pour lancer Oxlint séparément.
 
 Les actions sensibles doivent rester refusées par défaut et nécessiter une confirmation explicite.
 

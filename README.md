@@ -29,6 +29,10 @@ bun run check
 bun run dev
 ```
 
+Les commandes `bun run format` et `bun run lint` appliquent respectivement
+Oxfmt et Oxlint. `bun run check` vérifie le formatage, le lint et les types
+avant chaque contribution.
+
 Le démarrage charge les commandes et événements depuis `src/commands/` et `src/events/`, connecte le client Discord, puis synchronise entièrement les commandes. La portée est globale par défaut ou limitée à `DISCORD_GUILD_ID` ; l’autre portée est vidée pour éviter les commandes obsolètes. Ne renseigne jamais de secret dans Git : `.env` est ignoré. Le provider et la boucle agentique sont encore une base d'architecture ; les tools métier viendront ensuite.
 
 ## Configuration IA
@@ -52,11 +56,11 @@ La fonction `approval` permet au code généré d'attendre une validation Discor
 
 ```ts
 const result = await approval({
-  description: "Envoyer un message dans #general",
+	description: "Envoyer un message dans #general",
 });
 
 if (result.approved) {
-  // appeler ici le tool d'action
+	// appeler ici le tool d'action
 }
 ```
 

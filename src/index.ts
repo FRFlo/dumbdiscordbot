@@ -22,24 +22,24 @@ approvals.attachClient(discord.client);
 
 let shuttingDown = false;
 const shutdown = async (exitCode: number): Promise<void> => {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  await observability.shutdown();
-  approvals.close();
-  discord.client.followUps.close();
-  discord.client.destroy();
-  process.exit(exitCode);
+	if (shuttingDown) return;
+	shuttingDown = true;
+	await observability.shutdown();
+	approvals.close();
+	discord.client.followUps.close();
+	discord.client.destroy();
+	process.exit(exitCode);
 };
 
 process.on("uncaughtException", (error) => {
-  logger.error("Exception non interceptée", { error: String(error) });
-  observability.captureError(error, { area: "process.uncaught_exception" });
-  void shutdown(1);
+	logger.error("Exception non interceptée", { error: String(error) });
+	observability.captureError(error, { area: "process.uncaught_exception" });
+	void shutdown(1);
 });
 process.on("unhandledRejection", (reason) => {
-  logger.error("Promesse rejetée sans gestionnaire", { error: String(reason) });
-  observability.captureError(reason, { area: "process.unhandled_rejection" });
-  void shutdown(1);
+	logger.error("Promesse rejetée sans gestionnaire", { error: String(reason) });
+	observability.captureError(reason, { area: "process.unhandled_rejection" });
+	void shutdown(1);
 });
 process.on("SIGINT", () => void shutdown(0));
 process.on("SIGTERM", () => void shutdown(0));
