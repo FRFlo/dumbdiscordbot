@@ -1,8 +1,8 @@
-import { ChannelType } from "discord.js";
+import { ChannelType, type CategoryChannel } from "discord.js";
 import { toolDefinition } from "@tanstack/ai";
 import { z } from "zod";
 import type { ConversationContext } from "../domain/types";
-import { approve, requireChannel, requireGuild } from "./discord-runtime";
+import { approve, requireCategory, requireChannel, requireGuild } from "./discord-runtime";
 import { channelSummary, threadSummary } from "./discord-helpers";
 
 type Exec = { context?: ConversationContext };
@@ -74,8 +74,124 @@ const unlock = toolDefinition({
 	inputSchema: z.object({ channelId: z.string() }),
 	outputSchema: anyResult,
 });
+const listCategories = toolDefinition({
+	name: "list_categories",
+	description: "Liste les catégories d'un serveur Discord.",
+	inputSchema: z.object({ guildId: z.string().optional() }),
+	outputSchema: z.array(anyResult),
+});
+const getCategory = toolDefinition({
+	name: "get_category",
+	description: "Récupère une catégorie Discord par son identifiant.",
+	inputSchema: z.object({ categoryId: z.string(), guildId: z.string().optional() }),
+	outputSchema: anyResult,
+});
+const createCategory = toolDefinition({
+	name: "create_category",
+	description: "Crée une catégorie Discord.",
+	inputSchema: z.object({
+		name: z.string().min(1).max(100),
+		position: z.number().int().min(0).max(1_000).optional(),
+		guildId: z.string().optional(),
+	}),
+	outputSchema: anyResult,
+});
+const editCategory = toolDefinition({
+	name: "edit_category",
+	description: "Modifie le nom ou la position d'une catégorie Discord.",
+	inputSchema: z.object({
+		categoryId: z.string(),
+		name: z.string().min(1).max(100).optional(),
+		position: z.number().int().min(0).max(1_000).optional(),
+		guildId: z.string().optional(),
+	}),
+	outputSchema: anyResult,
+});
+const deleteCategory = toolDefinition({
+	name: "delete_category",
+	description: "Supprime une catégorie Discord après approbation.",
+	inputSchema: z.object({
+		categoryId: z.string(),
+		guildId: z.string().optional(),
+		approvalToken: z.string().optional(),
+	}),
+	outputSchema: z.object({ deleted: z.boolean(), id: z.string() }),
+});
+const moveCategory = toolDefinition({
+	name: "move_category",
+	description: "Déplace une catégorie dans l'ordre des salons Discord.",
+	inputSchema: z.object({
+		categoryId: z.string(),
+		position: z.number().int().min(0).max(1_000),
+		guildId: z.string().optional(),
+	}),
+	outputSchema: anyResult,
+});
 
 export default [
+	listCategories.server(async ({ guildId }, execution: Exec) => {
+		const guild = requireGuild(execution.context, guildId);
+		const categories = [...guild.channels.cache.values()].filter(
+			(channel): channel is CategoryChannel => channel.type === ChannelType.GuildCategory,
+		);
+		return categories
+			.sort((left, right) => left.position - right.position)
+			.map((category) => ({
+				...channelSummary(category),
+				position: category.position,
+				childChannelIds: category.children.cache.map((child) => child.id),
+			}));
+	}),
+	getCategory.server(async ({ categoryId, guildId }, execution: Exec) => {
+		const category = requireCategory(requireGuild(execution.context, guildId), categoryId);
+		return {
+			...channelSummary(category),
+			position: category.position,
+			childChannelIds: category.children.cache.map((child) => child.id),
+		};
+	}),
+	createCategory.server(async ({ name, position, guildId }, execution: Exec) => {
+		const category = await requireGuild(execution.context, guildId).channels.create({
+			name,
+			type: ChannelType.GuildCategory,
+		});
+		if (position !== undefined) await category.setPosition(position);
+		return {
+			...channelSummary(category),
+			position: category.position,
+			childChannelIds: [],
+		};
+	}),
+	editCategory.server(async ({ categoryId, name, position, guildId }, execution: Exec) => {
+		const category = requireCategory(requireGuild(execution.context, guildId), categoryId);
+		if (name !== undefined) await category.edit({ name });
+		if (position !== undefined) await category.setPosition(position);
+		return {
+			...channelSummary(category),
+			position: category.position,
+			childChannelIds: category.children.cache.map((child) => child.id),
+		};
+	}),
+	deleteCategory.server(async ({ categoryId, guildId, approvalToken }, execution: Exec) => {
+		const category = requireCategory(requireGuild(execution.context, guildId), categoryId);
+		await approve(
+			"delete_category",
+			[category.id],
+			approvalToken,
+			`Supprimer la catégorie ${category.id}`,
+		);
+		await category.delete();
+		return { deleted: true, id: category.id };
+	}),
+	moveCategory.server(async ({ categoryId, position, guildId }, execution: Exec) => {
+		const category = requireCategory(requireGuild(execution.context, guildId), categoryId);
+		await category.setPosition(position);
+		return {
+			...channelSummary(category),
+			position: category.position,
+			childChannelIds: category.children.cache.map((child) => child.id),
+		};
+	}),
 	create.server(async ({ name, type, parentId, topic }, execution: Exec) => {
 		const guild = requireGuild(execution.context);
 		const channel = await guild.channels.create({

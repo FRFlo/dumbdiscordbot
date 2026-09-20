@@ -48,6 +48,10 @@ Les arguments `guildId` et `channelId` acceptent également la valeur
 `"current"`. Elle résout automatiquement le serveur ou le salon du message
 courant, y compris depuis le code exécuté dans Code Mode.
 
+Les catégories disposent de tools dédiés pour les lister, les récupérer, les
+créer, les modifier, les déplacer et les supprimer. La suppression d'une
+catégorie reste protégée par une approbation ciblée.
+
 ## Permissions Discord
 
 Le bot doit disposer des intents privilégiés et permissions correspondant aux

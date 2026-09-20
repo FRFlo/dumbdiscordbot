@@ -1,4 +1,11 @@
-import type { Client, Guild, GuildMember, Role } from "discord.js";
+import {
+	ChannelType,
+	type CategoryChannel,
+	type Client,
+	type Guild,
+	type GuildMember,
+	type Role,
+} from "discord.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { ApprovalManager } from "../discord/approval";
 import type { ConversationContext } from "../domain/types";
@@ -40,6 +47,25 @@ export function requireChannel(guild: Guild, channelId: string) {
 	const channel = guild.channels.cache.get(resolvedId);
 	if (!channel?.isTextBased()) throw new Error("Salon textuel introuvable ou hors périmètre.");
 	return channel;
+}
+
+export function requireCategory(guild: Guild, categoryId: string): CategoryChannel {
+	const context = getToolContext();
+	const currentChannel =
+		categoryId === "current" && context?.channelId
+			? guild.channels.cache.get(context.channelId)
+			: undefined;
+	const resolvedId =
+		categoryId === "current"
+			? currentChannel?.type === ChannelType.GuildCategory
+				? currentChannel.id
+				: currentChannel?.parentId
+			: categoryId;
+	const category = resolvedId ? guild.channels.cache.get(resolvedId) : undefined;
+	if (!category || category.type !== ChannelType.GuildCategory) {
+		throw new Error("Catégorie introuvable ou hors périmètre.");
+	}
+	return category;
 }
 
 export async function requireMember(guild: Guild, userId: string): Promise<GuildMember> {
