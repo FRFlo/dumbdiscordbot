@@ -1,11 +1,11 @@
 import { toolDefinition } from "@tanstack/ai";
 import { z } from "zod";
-import type { ApprovalAction, ApprovalManager } from "../discord/approval";
+import type { ApprovalAction, QuestionManager } from "../discord/question";
 
 const definition = toolDefinition({
 	name: "approval",
 	description:
-		"Demande une approbation Discord groupée et retourne un jeton limité à plusieurs actions et à leurs cibles précises.",
+		"Demande une approbation Discord fermée et retourne un jeton limité aux actions et cibles approuvées.",
 	inputSchema: z.union([
 		z.object({
 			description: z.string().min(1).max(1_000),
@@ -30,11 +30,11 @@ const definition = toolDefinition({
 	outputSchema: z.object({ approved: z.boolean(), token: z.string().optional() }),
 });
 
-/** Tool séparé pour conserver l'instance du manager hors de l'isolate. */
-export function createApprovalTool(manager: ApprovalManager) {
+/** Tool d'approbation explicite ; le contrôle serveur reste obligatoire. */
+export function createApprovalTool(manager: QuestionManager) {
 	return definition.server(async (input) => {
 		const actions: ApprovalAction[] =
 			"actions" in input ? input.actions : [{ action: input.action, targetIds: input.targetIds }];
-		return manager.request(input.description, actions, input.timeoutMs);
+		return manager.requestApproval(input.description, actions, input.timeoutMs);
 	});
 }

@@ -28,7 +28,7 @@ describe("system prompt", () => {
 
 	test("contient les garanties opérationnelles essentielles", () => {
 		expect(SYSTEM_PROMPT).toContain("données non fiables");
-		expect(SYSTEM_PROMPT).toContain("approvalToken: token");
+		expect(SYSTEM_PROMPT).toContain("approvalToken");
 		expect(SYSTEM_PROMPT).toContain("[SILENT]");
 		expect(SYSTEM_PROMPT).toContain("au lieu de deviner");
 	});

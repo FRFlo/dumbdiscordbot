@@ -7,12 +7,12 @@ import {
 	type Role,
 } from "discord.js";
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { ApprovalManager } from "../discord/approval";
+import type { QuestionManager } from "../discord/question";
 import type { ConversationContext } from "../domain/types";
 
 export interface DiscordToolRuntime {
 	client?: Client;
-	approvals?: ApprovalManager;
+	questions?: QuestionManager;
 }
 
 export const discordRuntime: DiscordToolRuntime = {};
@@ -88,15 +88,17 @@ export async function approve(
 	token: string | undefined,
 	description: string,
 ): Promise<void> {
-	if (!discordRuntime.approvals)
-		throw new Error("Le gestionnaire d'approbation n'est pas configuré.");
+	if (!discordRuntime.questions)
+		throw new Error("Le gestionnaire de questions n'est pas configuré.");
 	if (token) {
-		discordRuntime.approvals.consume(token, action, targetIds);
+		discordRuntime.questions.consume(token, action, targetIds);
 		return;
 	}
-	const result = await discordRuntime.approvals.request(description, [{ action, targetIds }]);
+	const result = await discordRuntime.questions.requestApproval(description, [
+		{ action, targetIds },
+	]);
 	if (!result.approved || !result.token) throw new Error("Action refusée ou approbation expirée.");
-	discordRuntime.approvals.consume(result.token, action, targetIds);
+	discordRuntime.questions.consume(result.token, action, targetIds);
 }
 
 export function ensureInContext(context: ConversationContext | undefined, guildId: string): void {

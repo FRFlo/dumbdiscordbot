@@ -50,9 +50,11 @@ podman run --env-file .env dumbdiscordbot
 
 Le conteneur reste recommandé pour la production et permet de conserver les limites natives `maxStackSize` et `maxToolCalls` du driver Bun.
 
-### Approbations Code Mode
+### Questions et approbations Code Mode
 
-La fonction `approval` permet au code généré d'attendre une validation Discord avant une action sensible :
+Le tool `question` permet au code généré de demander une réponse interactive : question fermée, choix simple, choix multiples ou réponse libre. Les choix fermés utilisent un bouton vert pour le choix positif et rouge pour le choix négatif ou destructif.
+
+Le tool `approval` est conservé pour les actions sensibles et retourne un jeton limité aux actions et cibles approuvées :
 
 ```ts
 const result = await approval({
@@ -63,6 +65,8 @@ if (result.approved) {
 	// appeler ici le tool d'action
 }
 ```
+
+Les opérations sensibles peuvent également déclencher automatiquement cette approbation lorsqu'aucun jeton n'est fourni.
 
 Les boutons sont valides pour l'auteur de la demande uniquement. La durée maximale
 est contrôlée par `APPROVAL_TIMEOUT_MS` (20 secondes par défaut), et l'exécution

@@ -35,22 +35,32 @@ Les fichiers `discord-*.ts` constituent les catégories principales :
 Le registre publie également une catégorie dérivée et des tags (`sector-scoped`,
 `destructive`, `requires-approval`) dans son catalogue interne.
 
-## Approbations
+## Questions et approbations
+
+Le tool `question` permet quatre interactions Discord :
+
+- `closed` : deux choix, avec bouton positif vert et bouton négatif/destructif rouge ;
+- `single` : un choix parmi des options décrites, avec une réponse `Autre` facultative ;
+- `multiple` : plusieurs choix parmi des options décrites, avec `Autre` facultatif ;
+- `free` : réponse libre via une modale Discord.
+
+La réponse est limitée à l'auteur et au salon du contexte courant. Les questions expirées,
+annulées ou fermées au redémarrage renvoient `answered: false`.
 
 Les tools de lecture, les actions réversibles et les opérations usuelles ne
 bloquent pas sur une approbation. Les opérations à impact très élevé gardent
 une protection côté serveur : suppression de messages/salons/rôles/événements,
 ban, kick, unban, suppression groupée et départ d'un serveur.
 
-Pour les actions sensibles mais réversibles, le modèle peut appeler le tool
-`approval` dans le code TypeScript généré lorsqu'il estime qu'une confirmation
-utilisateur est nécessaire. Une approbation renvoie un jeton éphémère limité à
+Le tool `approval` utilise une question fermée Approuver/Refuser. Une approbation
+renvoie un jeton éphémère limité à
 plusieurs actions et à la liste exacte des cibles de chacune. Le même
 `approvalToken` peut donc être transmis à plusieurs tools différents sans
 afficher une nouvelle demande Discord. Chaque tool vérifie et consomme sa
 propre cible individuellement.
 Le prompt agentique lui demande explicitement de ne pas demander d'approbation
-par défaut pour les lectures et actions courantes.
+par défaut pour les lectures et actions courantes. Les actions sensibles peuvent
+également déclencher automatiquement une approbation si aucun jeton n'est fourni.
 
 ## Isolation
 

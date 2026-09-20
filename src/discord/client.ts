@@ -4,14 +4,14 @@ import type { AppConfig } from "../config";
 import type { Logger } from "../observability/logger";
 import type { PostHogObservability } from "../observability/posthog";
 import { FollowUpState } from "./follow-up";
-import type { ApprovalManager } from "./approval";
+import type { QuestionManager } from "./question";
 
 export function createDiscordClient(
 	agent: Agent,
 	logger: Logger,
 	observability: PostHogObservability,
 	config: AppConfig,
-	approvals: ApprovalManager,
+	questions: QuestionManager,
 ): Client {
 	const client = new Client({
 		intents: [
@@ -39,6 +39,6 @@ export function createDiscordClient(
 	client.logger = logger;
 	client.observability = observability;
 	client.followUps = new FollowUpState(config.followUpTimeoutMs, config.sessionDatabasePath);
-	client.approvals = approvals;
+	client.questions = questions;
 	return client;
 }

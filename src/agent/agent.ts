@@ -8,7 +8,7 @@ import type { ConversationContext } from "../domain/types";
 import type { Logger } from "../observability/logger";
 import type { PostHogObservability } from "../observability/posthog";
 import { ToolRegistry } from "../tools/registry";
-import type { ApprovalManager } from "../discord/approval";
+import type { QuestionManager } from "../discord/question";
 import { discordContextStorage } from "../tools/discord-runtime";
 import { SYSTEM_PROMPT, formatDiscordRequest, formatHistoryMessage } from "./system-prompt";
 
@@ -47,7 +47,7 @@ export class Agent {
 		private readonly tools: ToolRegistry,
 		private readonly logger: Logger,
 		private readonly observability: PostHogObservability,
-		private readonly approvals: ApprovalManager,
+		private readonly questions: QuestionManager,
 	) {
 		this.model = config.openAiModel;
 		this.adapter = openaiCompatibleText(config.openAiModel, {
@@ -67,7 +67,7 @@ export class Agent {
 
 	public async respond(context: ConversationContext, maxAgentIterations: number): Promise<string> {
 		return discordContextStorage.run(context, () =>
-			this.approvals.run(context, async () => {
+			this.questions.run(context, async () => {
 				const runId = crypto.randomUUID();
 				const distinctId = `discord:${context.authorId}`;
 				const sessionId = `discord:${context.guildId ?? "dm"}:${context.channelId}`;
