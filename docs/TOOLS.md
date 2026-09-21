@@ -54,6 +54,12 @@ portée de l'utilisateur avant l'envoi. Les catégories, salons vocaux/stage et
 racines de forums ne sont pas des cibles de messages directes. Les mentions
 automatiques sont désactivées.
 
+Les tools `send_message`, `reply_to_message` et `edit_message` acceptent les
+options de contenu Discord en JSON : `content`, jusqu'à 10 `embeds`,
+`components`, des `files` sous forme d'URL, `allowedMentions`, `poll` et
+`tts`. Un message doit fournir au moins un de ces contenus. Les embeds suivent
+le format Discord (`title`, `description`, `color`, `fields`, `author`, etc.).
+
 ## Questions et approbations
 
 Le tool `question` permet quatre interactions Discord :

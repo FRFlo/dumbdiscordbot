@@ -4,6 +4,7 @@ import type { ConversationContext } from "../domain/types";
 import { approve, ensureChannelInContext, requireChannel, requireGuild } from "./discord-runtime";
 import { messageSummary } from "./discord-helpers";
 import { parseDiscordDestination, resolveDiscordDestination } from "../discord/destination";
+import { messageContent } from "./discord-message-content";
 
 type Exec = { context?: ConversationContext };
 const messageInput = z.object({
@@ -55,27 +56,19 @@ const send = toolDefinition({
 	name: "send_message",
 	description:
 		"Envoie un message vers une destination Discord. channelId accepte current, un identifiant historique, discord:channel:<id>, discord:channel:<id>:thread:<threadId>, discord:dm:<userId> ou discord:group:<id>.",
-	inputSchema: z.object({ channelId: z.string(), content: z.string().min(1).max(2_000) }),
+	inputSchema: z.object({ channelId: z.string() }).and(messageContent),
 	outputSchema: output,
 });
 const reply = toolDefinition({
 	name: "reply_to_message",
 	description: "Répond à un message Discord après approbation.",
-	inputSchema: z.object({
-		channelId: z.string(),
-		messageId: z.string(),
-		content: z.string().min(1).max(2_000),
-	}),
+	inputSchema: z.object({ channelId: z.string(), messageId: z.string() }).and(messageContent),
 	outputSchema: output,
 });
 const edit = toolDefinition({
 	name: "edit_message",
 	description: "Modifie un message envoyé par le bot après approbation.",
-	inputSchema: z.object({
-		channelId: z.string(),
-		messageId: z.string(),
-		content: z.string().min(1).max(2_000),
-	}),
+	inputSchema: z.object({ channelId: z.string(), messageId: z.string() }).and(messageContent),
 	outputSchema: output,
 });
 const remove = toolDefinition({
@@ -144,25 +137,29 @@ export default [
 		}
 		return { messages: result.slice(0, max) };
 	}),
-	send.server(async ({ channelId, content }, execution: Exec) => {
+	send.server(async ({ channelId, ...content }, execution: Exec) => {
 		const destination = parseDiscordDestination(channelId, execution.context);
 		const channel = await resolveDiscordDestination(destination, execution.context);
-		return messageSummary(await channel.send({ content }));
+		return messageSummary(await channel.send(content as Parameters<typeof channel.send>[0]));
 	}),
-	reply.server(async ({ channelId, messageId, content }, execution: Exec) => {
+	reply.server(async ({ channelId, messageId, ...content }, execution: Exec) => {
 		const destination = parseDiscordDestination(channelId, execution.context);
 		const channel = await resolveDiscordDestination(destination, execution.context);
 		if (!("messages" in channel))
 			throw new Error("La destination ne permet pas de répondre à un message.");
 		const messages = channel.messages;
 		return messageSummary(
-			await messages.fetch(messageId).then((message) => message.reply({ content })),
+			await messages
+				.fetch(messageId)
+				.then((message) => message.reply(content as Parameters<typeof message.reply>[0])),
 		);
 	}),
-	edit.server(async ({ channelId, messageId, content }, execution: Exec) => {
+	edit.server(async ({ channelId, messageId, ...content }, execution: Exec) => {
 		const messages = await fetchMessage(channelId, execution.context);
 		return messageSummary(
-			await messages.fetch(messageId).then((message) => message.edit({ content })),
+			await messages
+				.fetch(messageId)
+				.then((message) => message.edit(content as Parameters<typeof message.edit>[0])),
 		);
 	}),
 	remove.server(async ({ channelId, messageId, approvalToken }, execution: Exec) => {
