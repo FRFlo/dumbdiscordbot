@@ -34,5 +34,13 @@ describe("system prompt", () => {
 		expect(SYSTEM_PROMPT).toContain("Préfère toujours le déterminisme");
 		expect(SYSTEM_PROMPT).toContain("Intl.DateTimeFormat");
 		expect(SYSTEM_PROMPT).toContain("discord:channel:<id>:thread:<threadId>");
+		expect(SYSTEM_PROMPT).toContain("<t:UNIX:R>");
+		expect(SYSTEM_PROMPT).toContain("<@USER_ID>");
+		expect(SYSTEM_PROMPT).toContain("allowedMentions");
+		expect(SYSTEM_PROMPT).toContain("<https://example.com>");
+		expect(SYSTEM_PROMPT).toContain("<t:UNIX:R>");
+		expect(SYSTEM_PROMPT).toContain("<@USER_ID>");
+		expect(SYSTEM_PROMPT).toContain("allowedMentions");
+		expect(SYSTEM_PROMPT).toContain("<https://example.com>");
 	});
 });
