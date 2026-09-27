@@ -6,7 +6,7 @@
       "name": "dumbdiscordbot",
       "dependencies": {
         "@tanstack/ai": "^0.55.0",
-        "@tanstack/ai-code-mode": "^0.4.10",
+        "@tanstack/ai-code-mode": "^0.4.13",
         "@tanstack/ai-isolate-quickjs": "^0.3.1",
         "@tanstack/ai-isolate-quickjs-bun": "^0.1.1",
         "@tanstack/ai-openai": "^0.22.8",
@@ -145,7 +145,7 @@
 
     "@tanstack/ai": ["@tanstack/ai@0.55.0", "", { "dependencies": { "@ag-ui/core": "0.1.1-canary.beta.0", "@standard-schema/spec": "^1.1.0", "@tanstack/ai-event-client": "^0.11.3", "@tanstack/ai-utils": "^0.4.0", "partial-json": "^0.1.7" }, "peerDependencies": { "@opentelemetry/api": ">=1.9.0" }, "optionalPeers": ["@opentelemetry/api"] }, "sha512-VkevqxTDQWeVjWIAR2SQzR6Hi8t6dNdZHfh4jQZEumanwyzsUbBvuPpzf6RldnMY7Z4eX0MHfV9esxAiOukc+A=="],
 
-    "@tanstack/ai-code-mode": ["@tanstack/ai-code-mode@0.4.10", "", { "dependencies": { "sucrase": "^3.35.0" }, "peerDependencies": { "@tanstack/ai": "^0.55.0", "zod": "^3.0.0 || ^4.0.0" } }, "sha512-F9TkKGpCNP28sm1XLHP75v8KWwVW3U0MpwrgX5PQ4LEqYZiv5TN/hq4st61BlP+nWcNJiULRM4h3pH0FQD6Ebw=="],
+    "@tanstack/ai-code-mode": ["@tanstack/ai-code-mode@0.4.13", "", { "dependencies": { "sucrase": "^3.35.0" }, "peerDependencies": { "@tanstack/ai": "^0.58.0", "zod": "^3.0.0 || ^4.0.0" } }, "sha512-k6PlXtBRuMc9AJQslOhPpjCMBLn13OtaldybJEXTuxa9ua6wQphTWqsAuwTrl/FzRR/pQ7KZMzi8SWlSUJOdng=="],
 
     "@tanstack/ai-event-client": ["@tanstack/ai-event-client@0.11.3", "", { "dependencies": { "@tanstack/devtools-event-client": "^0.4.1" } }, "sha512-K5Nw05TG2NPJNunV7LI/5m7S97XHHdxN7vwTYcbKbmA5txlToaiF4wCfYBT406m7BOeGlLHZJpr3m1M6Vaai4g=="],
 
